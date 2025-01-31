@@ -4,12 +4,12 @@ from typing import Dict, List, Union
 import torch
 
 from ...graph.dag_graph_builder import DAGGraphBuilder
-from ..importer import Importer
+from ..canonicalizer import Canonicalizer
 from .torch_op_converter import TorchOpConverter
 from ...ir.safe_ir import ScalarSpec, ScalarType, TensorSpec, TensorType, DataType
 
 
-class TorchImporter(Importer):
+class TorchCanonicalizer(Canonicalizer):
     def __init__(self, model: torch.jit.ScriptModule):
         super().__init__()
 

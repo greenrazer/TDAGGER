@@ -2,7 +2,7 @@ from typing import Dict
 import torch
 
 from .torch_op_converter import TorchOpConverter
-from ..exporter import Exporter
+from ..reifier import Reifier
 from ...ir.safe_ir import (
     DataType,
     ScalarSpec,
@@ -11,7 +11,7 @@ from ...ir.safe_ir import (
     TensorType,
 )
 
-class TorchExporter(Exporter):
+class TorchReifier(Reifier):
     def __init__(self, graph):
         super().__init__()
 

@@ -2,8 +2,8 @@ import torch
 
 from .graph import DAGGraphBuilder, DAGGraph
 
-from .exporters import TorchExporter
-from .importers import TorchImporter
+from .reifiers import TorchReifier
+from .canonicalizers import TorchCanonicalizer
 
 
 class SafeDAG:
@@ -12,12 +12,12 @@ class SafeDAG:
 
     @staticmethod
     def from_torchscript(model: torch.jit.ScriptModule) -> "SafeDAG":
-        importer = TorchImporter(model)
+        canonicalizer = TorchCanonicalizer(model)
         graph_builder = DAGGraphBuilder()
-        importer.build_graph(graph_builder)
+        canonicalizer.build_graph(graph_builder)
         graph = graph_builder.build()
         return SafeDAG(graph)
 
     def to_torchscript(self) -> torch.nn.Module:
-        exporter = TorchExporter(self.graph)
-        return exporter.export()
+        reifier = TorchReifier(self.graph)
+        return reifier.export()

@@ -3,7 +3,7 @@ from abc import ABC, abstractmethod
 from ..graph.dag_graph_builder import DAGGraphBuilder
 
 
-class Importer(ABC):
+class Canonicalizer(ABC):
     @abstractmethod
     def build_graph(self, graph_builder: DAGGraphBuilder):
         pass
