@@ -135,21 +135,18 @@ class TorchOpConverter:
         clean_input_names = self._inputs_to_names(ctx)
 
         # torch add unintuitively has 3 inputs a, b, and alpha for a + alpha*b
+        # I will ignore the alpha parameter beacuse it is not nessisary, 
+        # and if someone is using it they are doing something wrong
         out_name = ctx.torch_op.output().debugName().replace(".", "_")
-        multiply_op = BinaryElementwiseType(
-            name=f"{out_name}_multiply",
-            inputs={"input_0": clean_input_names[1], "input_1": clean_input_names[2]},
-            spec=BinaryElementwiseSpec.MULTIPLY,
-            debug_sources=ctx.debug_sources,
-        )
+
         add_op = BinaryElementwiseType(
             name=out_name,
-            inputs={"input_0": clean_input_names[0], "input_1": f"{out_name}_multiply"},
+            inputs={"input_0": clean_input_names[0], "input_1": clean_input_names[1]},
             spec=BinaryElementwiseSpec.ADD,
             debug_sources=ctx.debug_sources,
         )
 
-        return [multiply_op, add_op]
+        return [add_op]
 
     def _convert_unary_elementwise(self, ctx: ConversionContext) -> List[OpType]:
         clean_input_names = self._inputs_to_names(ctx)
