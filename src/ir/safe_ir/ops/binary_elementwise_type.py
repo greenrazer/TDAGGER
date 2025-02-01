@@ -3,7 +3,7 @@ from typing import Dict, List, Tuple, Union
 from .op_type import OpType
 
 
-class BinaryArithmeticSpec(Enum):
+class BinaryElementwiseSpec(Enum):
     ADD = auto()
     SUBTRACT = auto()
     MULTIPLY = auto()
@@ -32,10 +32,10 @@ class BinaryArithmeticSpec(Enum):
                 return "divide"
 
 
-class BinaryArithmeticType(OpType):
-    spec: BinaryArithmeticSpec
+class BinaryElementwiseType(OpType):
+    spec: BinaryElementwiseSpec
 
-    def __init__(self, name, inputs, spec: BinaryArithmeticSpec, debug_sources=[]):
+    def __init__(self, name, inputs, spec: BinaryElementwiseSpec, debug_sources=[]):
         super().__init__(name, inputs, debug_sources=debug_sources)
         self.spec = spec
 

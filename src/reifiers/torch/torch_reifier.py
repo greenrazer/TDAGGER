@@ -213,9 +213,10 @@ class TorchReifier(Reifier):
             if not ready_ops:
                 remaining_ops = ops_to_process - self.processed_ops
                 for r in remaining_ops:
-                    print(r)
-                    for input_val in r.inputs():
-                        print("     ", input_val, self.output_value_to_op[input_val], self.output_value_to_op[input_val] in self.processed_ops)
+                    op_debug = self.ir_graph.ops[r]
+                    print(op_debug)
+                    for input_val in op_debug.inputs:
+                        print("     ", input_val)
                 if remaining_ops:
                     raise Exception(
                         "Graph creation failed: All remaining unprocessed ops have at least one unprocessed input."

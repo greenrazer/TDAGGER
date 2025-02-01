@@ -2,7 +2,40 @@ from dataclasses import dataclass
 from typing import Callable, Dict, List, Tuple, Union
 import torch
 
-from ...ir.safe_ir import OpType, BinaryArithmeticType, BinaryArithmeticSpec
+from ...ir.safe_ir import (
+    OpType,
+    DataType,
+    TensorSpec,
+    BinaryElementwiseType,
+    BinaryElementwiseSpec,
+    UnaryElementwiseSpec,
+    UnaryElementwiseType,
+    LeakyRELUType,
+    ELUType,
+)
+
+ATEN_TO_UNARY_ELEMENTWISE_SPEC = {
+    "aten::abs": UnaryElementwiseSpec.ABS,
+    "aten::neg": UnaryElementwiseSpec.NEGATIVE,
+    "aten::sqrt": UnaryElementwiseSpec.SQUARE_ROOT,
+    "aten::square": UnaryElementwiseSpec.SQUARE,
+    "aten::exp": UnaryElementwiseSpec.EXP,
+    "aten::log": UnaryElementwiseSpec.LOG,
+    "aten::sin": UnaryElementwiseSpec.SIN,
+    "aten::cos": UnaryElementwiseSpec.COS,
+    "aten::tan": UnaryElementwiseSpec.TAN,
+    "aten::asin": UnaryElementwiseSpec.ARCSIN,
+    "aten::acos": UnaryElementwiseSpec.ARCCOS,
+    "aten::atan": UnaryElementwiseSpec.ARCTAN,
+    "aten::sinh": UnaryElementwiseSpec.SINH,
+    "aten::cosh": UnaryElementwiseSpec.COSH,
+    "aten::tanh": UnaryElementwiseSpec.TANH,
+    "aten::asinh": UnaryElementwiseSpec.ARCSINH,
+    "aten::acosh": UnaryElementwiseSpec.ARCCOSH,
+    "aten::atanh": UnaryElementwiseSpec.ARCTANH,
+    "aten::relu": UnaryElementwiseSpec.RELU,
+    "aten::selu": UnaryElementwiseSpec.SELU,
+}
 
 
 @dataclass
@@ -25,6 +58,15 @@ class TorchOpConverter:
         self._converters.update(
             {
                 "aten::add": self._convert_add,
+                "aten::leaky_relu": self._convert_leaky_relu,
+                "aten::elu": self._convert_elu,
+            }
+        )
+
+        self._converters.update(
+            {
+                key: self._convert_unary_elementwise
+                for key in ATEN_TO_UNARY_ELEMENTWISE_SPEC.keys()
             }
         )
 
@@ -49,9 +91,7 @@ class TorchOpConverter:
 
         return self._converters[torch_op.kind()](ctx)
 
-    def _convert_add(self, ctx: ConversionContext) -> List[OpType]:
-        # torch add unintuitively has 3 inputs a, b, and alpha for a + alpha*b
-
+    def _inputs_to_names(self, ctx: ConversionContext) -> List[str]:
         input_names = []
         for input_value in ctx.torch_op.inputs():
             if input_value in ctx.output_value_to_name:
@@ -60,25 +100,96 @@ class TorchOpConverter:
                 in_name = input_value.debugName().replace(".", "_")
 
             input_names.append(in_name)
+        return input_names
 
+    def _inputs_to_nodes(self, ctx: ConversionContext) -> List[torch._C.Node]:
+        return [ctx.output_value_to_node[i] for i in ctx.torch_op.inputs()]
+
+    def _inputs_to_torch_types(self, ctx):
+        return [i.type().kind() for i in ctx.torch_op.inputs()]
+
+    def _inputs_to_scalar_values(self, ctx):
+        input_scalar_values = []
+        for input_value in ctx.torch_op.inputs():
+            node = ctx.output_value_to_node[input_value]
+            # node is none if it is a placeholder
+            if node is None or node.kind() not in ["prim::Constant"]:
+                input_scalar_values.append(None)
+                continue
+            inp_type = input_value.type()
+            match inp_type.kind():
+                case "IntType":
+                    input_scalar_values.append(node.i("value"))
+                case "FloatType":
+                    input_scalar_values.append(node.f("value"))
+                case "StringType":
+                    input_scalar_values.append(node.s("value"))
+                case "BoolType":
+                    input_scalar_values.append(bool(node.i("value")))
+                case _:
+                    input_scalar_values.append(None)
+
+        return input_scalar_values
+
+    def _convert_add(self, ctx: ConversionContext) -> List[OpType]:
+        clean_input_names = self._inputs_to_names(ctx)
+
+        # torch add unintuitively has 3 inputs a, b, and alpha for a + alpha*b
         out_name = ctx.torch_op.output().debugName().replace(".", "_")
-        multiply_op = BinaryArithmeticType(
+        multiply_op = BinaryElementwiseType(
             name=f"{out_name}_multiply",
-            inputs={
-                "input_0": input_names[1],
-                "input_1": input_names[2]
-            },
-            spec=BinaryArithmeticSpec.MULTIPLY,
-            debug_sources=ctx.debug_sources
+            inputs={"input_0": clean_input_names[1], "input_1": clean_input_names[2]},
+            spec=BinaryElementwiseSpec.MULTIPLY,
+            debug_sources=ctx.debug_sources,
         )
-        add_op = BinaryArithmeticType(
+        add_op = BinaryElementwiseType(
             name=out_name,
-            inputs={
-                "input_0": input_names[0],
-                "input_1": f"{out_name}_multiply"
-            },
-            spec=BinaryArithmeticSpec.ADD,
-            debug_sources=ctx.debug_sources
+            inputs={"input_0": clean_input_names[0], "input_1": f"{out_name}_multiply"},
+            spec=BinaryElementwiseSpec.ADD,
+            debug_sources=ctx.debug_sources,
         )
 
         return [multiply_op, add_op]
+
+    def _convert_unary_elementwise(self, ctx: ConversionContext) -> List[OpType]:
+        clean_input_names = self._inputs_to_names(ctx)
+
+        out_name = ctx.torch_op.output().debugName().replace(".", "_")
+        unary_op = UnaryElementwiseType(
+            name=out_name,
+            inputs={"input": clean_input_names[0]},
+            spec=ATEN_TO_UNARY_ELEMENTWISE_SPEC[ctx.torch_op.kind()],
+            debug_sources=ctx.debug_sources,
+        )
+
+        return [unary_op]
+    
+    def _convert_leaky_relu(self, ctx: ConversionContext) -> List[OpType]:
+        clean_input_names = self._inputs_to_names(ctx)
+
+        out_name = ctx.torch_op.output().debugName().replace(".", "_")
+        leaky_relu_op = LeakyRELUType(
+            name=out_name,
+            inputs={
+                "input": clean_input_names[0],
+                "negative_slope": clean_input_names[1],
+            },
+            debug_sources=ctx.debug_sources,
+        )
+
+        return [leaky_relu_op]
+
+    def _convert_elu(self, ctx: ConversionContext) -> List[OpType]:
+        clean_input_names = self._inputs_to_names(ctx)
+
+        out_name = ctx.torch_op.output().debugName().replace(".", "_")
+        elu_op = ELUType(
+            name=out_name,
+            inputs={
+                "input": clean_input_names[0],
+                "alpha": clean_input_names[1]
+            },
+            debug_sources=ctx.debug_sources,
+        )
+
+        return [elu_op]

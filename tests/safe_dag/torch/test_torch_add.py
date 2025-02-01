@@ -16,7 +16,7 @@ class Basic(nn.Module):
         return x + self.to_add + self.my_buffer
 
 
-class TestTorchCanonicalizerBasic(unittest.TestCase):
+class TestTorchBasic(unittest.TestCase):
     def setUp(self):
         self.model = Basic()
         self.example_input = torch.rand((10, 20, 30, 40))
