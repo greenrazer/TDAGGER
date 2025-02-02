@@ -8,7 +8,7 @@ from src.safe_dag import SafeDAG
 
 class Unary(nn.Module):
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        x = torch.neg(x)
+        x = -x
         x = torch.abs(x)
         x = torch.sqrt(x)
         x = torch.exp(x)

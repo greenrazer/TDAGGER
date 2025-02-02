@@ -86,7 +86,11 @@ class IRToTorchOpConverter(OpConverter[ConversionContext, Callable, OpType, List
                 )
 
         match (input_0_val.type().kind(), input_1_val.type().kind(), ctx.op.spec):
-            case ("TensorType", _, BinaryElementwiseSpec.ADD):
+            case (
+                "TensorType",
+                _,
+                BinaryElementwiseSpec.ADD | BinaryElementwiseSpec.SUBTRACT,
+            ):
                 node.addInput(input_0_val)
                 node.addInput(input_1_val)
                 node.addInput(ctx.torch_graph.insertConstant(1))

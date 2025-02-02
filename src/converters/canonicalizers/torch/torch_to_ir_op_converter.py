@@ -36,6 +36,13 @@ ATEN_TO_UNARY_ELEMENTWISE_SPEC = {
     "aten::atanh": UnaryElementwiseSpec.ARCTANH,
 }
 
+ATEN_TO_BINARY_ELEMENTWISE_SPEC = {
+    "aten::add": BinaryElementwiseSpec.ADD,
+    "aten::sub": BinaryElementwiseSpec.SUBTRACT,
+    "aten::mul": BinaryElementwiseSpec.MULTIPLY,
+    "aten::div": BinaryElementwiseSpec.DIVIDE,
+}
+
 
 @dataclass
 class ConversionContext:
@@ -52,10 +59,16 @@ class TorchToIROpConverter(
     def _register_converters(self):
         self._converters.update(
             {
-                "aten::add": self._convert_add,
                 "aten::relu": self._convert_relu,
                 "aten::leaky_relu": self._convert_leaky_relu,
                 "aten::softplus": self._convert_softplus,
+            }
+        )
+
+        self._converters.update(
+            {
+                key: self._convert_binary_elementwise
+                for key in ATEN_TO_BINARY_ELEMENTWISE_SPEC.keys()
             }
         )
 
@@ -125,7 +138,7 @@ class TorchToIROpConverter(
 
         return input_scalar_values
 
-    def _convert_add(
+    def _convert_binary_elementwise(
         self, ctx: ConversionContext
     ) -> Tuple[List[OpType], Dict[str, Union[ScalarType, TensorType]]]:
         clean_input_names = self._inputs_to_names(ctx)
@@ -135,14 +148,14 @@ class TorchToIROpConverter(
         # and if someone is using it they are doing something wrong
         out_name = ctx.torch_op.output().debugName().replace(".", "_")
 
-        add_op = BinaryElementwiseType(
+        bin_op = BinaryElementwiseType(
             name=out_name,
             inputs={"input_0": clean_input_names[0], "input_1": clean_input_names[1]},
-            spec=BinaryElementwiseSpec.ADD,
+            spec=ATEN_TO_BINARY_ELEMENTWISE_SPEC[ctx.torch_op.kind()],
             debug_sources=ctx.debug_sources,
         )
 
-        return [add_op], {}
+        return [bin_op], {}
 
     def _convert_unary_elementwise(
         self, ctx: ConversionContext
