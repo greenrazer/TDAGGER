@@ -1,4 +1,3 @@
-import torch
 from torch._C import _jit_get_all_schemas
 
 
