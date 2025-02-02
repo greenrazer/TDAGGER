@@ -7,6 +7,7 @@ from ..ir.safe_ir import (
     OpType,
 )
 
+
 class DataLocation(Enum):
     INPUT = auto()
     CONSTANT = auto()
@@ -57,19 +58,19 @@ class DAGGraph:
         if name not in self.name_registry:
             raise Exception(f"Name not found in graph: {name}.")
         data_location = self.name_registry[name]
-        match data_location:      
+        match data_location:
             case DataLocation.INPUT:
-                return self.constant_tensors[name]   
+                return self.constant_tensors[name]
             case DataLocation.CONSTANT:
-                return self.constant_tensors[name]    
+                return self.constant_tensors[name]
             case DataLocation.PARAMETER:
-                return self.parameter_tensors[name]    
+                return self.parameter_tensors[name]
             case DataLocation.BUFFER:
                 return self.buffer_tensors[name]
             case DataLocation.OP:
                 return self.ops[name]
             case _:
                 raise Exception("Data location not found.")
-            
+
     def __str__(self):
-        return '\n'.join([op.__str__() for op in self.ops.values()])
+        return "\n".join([op.__str__() for op in self.ops.values()])
