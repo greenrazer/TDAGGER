@@ -2,7 +2,7 @@ from typing import Dict
 
 import torch
 
-from ...ir.safe_ir import (
+from ....ir.safe_ir import (
     DataType,
     ScalarSpec,
     ScalarType,
@@ -10,7 +10,7 @@ from ...ir.safe_ir import (
     TensorType,
 )
 from ..reifier import Reifier
-from .torch_op_converter import TorchOpConverter
+from .ir_to_torch_op_converter import IRToTorchOpConverter
 
 
 class TorchReifier(Reifier):
@@ -25,10 +25,10 @@ class TorchReifier(Reifier):
             module.register_parameter(name, param)
         for name, buffer in self._create_torch_buffers().items():
             module.register_buffer(name, buffer)
-        self.script_module =  torch.jit.script(module)
+        self.script_module = torch.jit.script(module)
 
         self.name_to_output_value: Dict[str, torch._C.Value] = {}
-        self.op_converter = TorchOpConverter()
+        self.op_converter = IRToTorchOpConverter()
         self.processed_ops = set()
 
         self.class_input = self._create_class_input()
@@ -52,7 +52,7 @@ class TorchReifier(Reifier):
                 input_value.setType(tensor_type)
             else:
                 raise Exception(f"Input type unknown: {type(input)}")
-        
+
             self.name_to_output_value[name] = input_value
             self.processed_ops.add(name)
 
@@ -83,9 +83,7 @@ class TorchReifier(Reifier):
                     case DataType.NONE:
                         const_node.output().setType(torch._C.NoneType.get())
                     case _:
-                        raise Exception(
-                            f"Unknown Constant DataType: {const.spec.type}"
-                        )
+                        raise Exception(f"Unknown Constant DataType: {const.spec.type}")
             elif isinstance(const, TensorType):
                 tensor_type = torch._C.TensorType.get().with_dtype(
                     const.spec.data_type.to_torch()
@@ -116,7 +114,7 @@ class TorchReifier(Reifier):
                 param_node.output().setType(tensor_type)
             else:
                 raise Exception(f"Parameter type unknown: {type(param)}")
-            
+
             self.processed_ops.add(name)
             self.name_to_output_value[name] = param_node.output()
 
@@ -175,9 +173,7 @@ class TorchReifier(Reifier):
         for name, param in self.ir_graph.parameters.items():
             if isinstance(param, TensorType):
                 parameters[name] = torch.nn.Parameter(
-                    torch.tensor(
-                        param.data, dtype=param.spec.data_type.to_torch()
-                    )
+                    torch.tensor(param.data, dtype=param.spec.data_type.to_torch())
                 )
         return parameters
 
@@ -189,27 +185,28 @@ class TorchReifier(Reifier):
                     buffer.data, dtype=buffer.spec.data_type.to_torch()
                 )
         return buffers
-    
+
     def _all_inputs_processed(self, op):
         return all(
-            [
-                input_name in self.processed_ops
-                for input_name in op.unique_indices
-            ]
+            [input_name in self.processed_ops for input_name in op.unique_indices]
         )
-    
+
     def export(self) -> torch.nn.Module:
         self._create_inputs()
         self._create_constants()
         self._create_parameters()
         self._create_buffers()
-    
+
         ops_to_process = {
-            op_name for op_name in self.ir_graph.ops.keys() if op_name not in self.processed_ops
+            op_name
+            for op_name in self.ir_graph.ops.keys()
+            if op_name not in self.processed_ops
         }
         while ops_to_process:
             ready_ops = {
-                self.ir_graph.ops[op_name] for op_name in ops_to_process if self._all_inputs_processed(self.ir_graph.ops[op_name])
+                self.ir_graph.ops[op_name]
+                for op_name in ops_to_process
+                if self._all_inputs_processed(self.ir_graph.ops[op_name])
             }
 
             if not ready_ops:
@@ -225,14 +222,14 @@ class TorchReifier(Reifier):
                     )
                 else:
                     break
-            
+
             for op in ready_ops:
                 for torch_op_node in self.op_converter.convert_op(
                     op, self.ir_graph, self.torch_graph, self.name_to_output_value
                 ):
                     self.torch_graph.insertNode(torch_op_node)
                     self.name_to_output_value[op.name] = torch_op_node.output()
-                
+
                 self.processed_ops.add(op.name)
                 ops_to_process.remove(op.name)
 
@@ -244,4 +241,3 @@ class TorchReifier(Reifier):
         self.script_module._forward_function = script_function
         self.script_module.forward = lambda *x: script_function(self.script_module, *x)
         return self.script_module
-        

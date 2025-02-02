@@ -3,7 +3,7 @@ from typing import Callable, Dict, List, Tuple, Union
 
 import torch
 
-from ...ir.safe_ir import (
+from ....ir.safe_ir import (
     BinaryElementwiseSpec,
     BinaryElementwiseType,
     DataType,
@@ -14,7 +14,7 @@ from ...ir.safe_ir import (
     UnaryElementwiseSpec,
     UnaryElementwiseType,
 )
-from ..op_converter import OpConverter
+from ..canon_op_converter import CanonOpConverter
 
 ATEN_TO_UNARY_ELEMENTWISE_SPEC = {
     "aten::abs": UnaryElementwiseSpec.ABSOLUTE_VALUE,
@@ -46,13 +46,9 @@ class ConversionContext:
     debug_sources: Union[None, List[Tuple[str, str, str]]]
 
 
-class TorchOpConverter(OpConverter):
-    def __init__(self):
-        self._converters: Dict[
-            str, Tuple[List[OpType], Dict[str, Union[ScalarType, TensorType]]]
-        ] = {}
-        self._register_converters()
-
+class TorchToIROpConverter(
+    CanonOpConverter[ConversionContext, Callable, torch._C.Node, Tuple]
+):
     def _register_converters(self):
         self._converters.update(
             {
@@ -70,25 +66,24 @@ class TorchOpConverter(OpConverter):
             }
         )
 
-    def convert_op(
+    def _create_context(
         self,
         torch_op: torch._C.Node,
         forward_graph: torch._C.Graph,
         output_value_to_node: Dict[torch._C.Value, torch._C.Node],
         output_value_to_name: Dict[torch._C.Value, str],
         debug_sources: Union[None, List[Tuple[str, str, str]]] = [],
-    ) -> Tuple[List[OpType], Dict[str, Union[ScalarType, TensorType]]]:
-        ctx = ConversionContext(
+    ) -> ConversionContext:
+        return ConversionContext(
             torch_op,
             forward_graph,
             output_value_to_node,
             output_value_to_name,
             debug_sources,
         )
-        if torch_op.kind() not in self._converters:
-            raise Exception(f"Unsupported operation type: {torch_op.kind()}")
 
-        return self._converters[torch_op.kind()](ctx)
+    def _get_operation_key(self, torch_op: "torch._C.Node") -> str:
+        return torch_op.kind()
 
     def _inputs_to_names(self, ctx: ConversionContext) -> List[str]:
         input_names = []

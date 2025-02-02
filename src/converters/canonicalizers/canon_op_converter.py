@@ -1,10 +1,6 @@
-from abc import ABC
-from dataclasses import dataclass
-from typing import Callable, Dict, List, Tuple, Union
+from typing import Callable, Dict, Generic, List, Tuple, TypeVar, Union
 
-import torch
-
-from ..ir.safe_ir import (
+from ...ir.safe_ir import (
     BinaryElementwiseSpec,
     BinaryElementwiseType,
     DataType,
@@ -16,8 +12,18 @@ from ..ir.safe_ir import (
     UnaryElementwiseType,
 )
 
+from ..op_converter import OpConverter
 
-class OpConverter(ABC):
+ContextT = TypeVar("ContextT")
+ConverterT = TypeVar("ConverterT")
+InputT = TypeVar("InputT")  # Type of the primary input (torch_op or op)
+OutputT = TypeVar("OutputT")  # Type of the conversion output
+
+
+class CanonOpConverter(
+    OpConverter[ContextT, ConverterT, InputT, OutputT],
+    Generic[ContextT, ConverterT, InputT, OutputT],
+):
     def _create_add_one(
         self, name: str, input: str, debug_sources=[]
     ) -> Tuple[List[OpType], Dict[str, Union[TensorType, ScalarType]]]:

@@ -3,8 +3,9 @@ from typing import Callable, Dict, List, Tuple, Union
 
 import torch
 
-from ...graph.dag_graph import DAGGraph
-from ...ir.safe_ir import BinaryElementwiseSpec, OpType, UnaryElementwiseSpec
+from ....graph.dag_graph import DAGGraph
+from ....ir.safe_ir import BinaryElementwiseSpec, OpType, UnaryElementwiseSpec
+from ...op_converter import OpConverter
 
 UNARY_ELEMENTWISE_SPEC_TO_ATEN = {
     str(UnaryElementwiseSpec.ABSOLUTE_VALUE): "aten::abs",
@@ -42,13 +43,7 @@ class ConversionContext:
     name_to_output_value: Dict[str, torch._C.Value]
 
 
-class TorchOpConverter:
-    def __init__(self):
-        self._converters: Dict[
-            str, Callable[[ConversionContext], List[Tuple[str, OpType]]]
-        ] = {}
-        self._register_converters()
-
+class IRToTorchOpConverter(OpConverter[ConversionContext, Callable, OpType, List]):
     def _register_converters(self):
         self._converters.update(
             {
@@ -64,19 +59,17 @@ class TorchOpConverter:
             }
         )
 
-    def convert_op(
+    def _create_context(
         self,
         op: OpType,
         graph: DAGGraph,
         torch_graph: torch._C.Graph,
         name_to_output_value: Dict[str, torch._C.Value],
-    ) -> List[torch._C.Node]:
-        ctx = ConversionContext(op, graph, torch_graph, name_to_output_value)
+    ) -> ConversionContext:
+        return ConversionContext(op, graph, torch_graph, name_to_output_value)
 
-        if op.type not in self._converters:
-            raise Exception(f"Unsupported operation type: {op.type}")
-
-        return self._converters[op.type](ctx)
+    def _get_operation_key(self, op: OpType) -> str:
+        return op.type
 
     def _convert_binary_elementwise(
         self, ctx: ConversionContext

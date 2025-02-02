@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 
-from ..graph.dag_graph_builder import DAGGraphBuilder
+from ...graph.dag_graph_builder import DAGGraphBuilder
 
 
 class Canonicalizer(ABC):

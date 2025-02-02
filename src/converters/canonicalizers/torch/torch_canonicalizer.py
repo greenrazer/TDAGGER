@@ -3,10 +3,10 @@ from typing import Dict, List, Union
 
 import torch
 
-from ...graph.dag_graph_builder import DAGGraphBuilder
-from ...ir.safe_ir import DataType, ScalarSpec, ScalarType, TensorSpec, TensorType
+from ....graph.dag_graph_builder import DAGGraphBuilder
+from ....ir.safe_ir import DataType, ScalarSpec, ScalarType, TensorSpec, TensorType
 from ..canonicalizer import Canonicalizer
-from .torch_op_converter import TorchOpConverter
+from .torch_to_ir_op_converter import TorchToIROpConverter
 
 
 class TorchCanonicalizer(Canonicalizer):
@@ -20,7 +20,7 @@ class TorchCanonicalizer(Canonicalizer):
         self.output_value_to_node = self._create_value_to_node_map()
         self.output_value_to_name = self._create_value_to_name_map()
         self.processed_nodes = set()
-        self.op_converter = TorchOpConverter()
+        self.op_converter = TorchToIROpConverter()
 
     def _retrieve_graph(self, model) -> torch._C.Graph:
         forward_graph = model.forward.graph.copy()

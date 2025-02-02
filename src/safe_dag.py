@@ -2,8 +2,8 @@ import torch
 
 from .graph import DAGGraphBuilder, DAGGraph
 
-from .reifiers import TorchReifier
-from .canonicalizers import TorchCanonicalizer
+from .converters.reifiers import TorchReifier
+from .converters.canonicalizers import TorchCanonicalizer
 
 
 class SafeDAG:
