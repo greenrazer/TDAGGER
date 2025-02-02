@@ -49,7 +49,7 @@ class BinaryElementwiseType(OpType):
     
     @property
     def type(self) -> str:
-        return f"binary_{self.spec}"
+        return f"{self.spec}"
 
     @property
     def required_input_keys(self) -> List[str]:

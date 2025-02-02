@@ -306,10 +306,15 @@ class TorchCanonicalizer(Canonicalizer):
             
             for node in ready_nodes:
                 debug_source = self._process_debug_source(node.sourceRange())
-                for safe_op in self.op_converter.convert_op(
+                safe_ops, consts = self.op_converter.convert_op(
                     node, self.forward_graph, self.output_value_to_node, self.output_value_to_name, debug_source
-                ):
+                )
+                for const_name, const in consts.items():
+                    graph_builder.add_constant(const_name, const)
+                
+                for safe_op in safe_ops:
                     graph_builder.add_op(safe_op.name, safe_op)
+
 
                 self.processed_nodes.add(node)
                 nodes_to_process.remove(node)

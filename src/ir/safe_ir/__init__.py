@@ -21,6 +21,4 @@ from .ops import (
     UnaryElementwiseType,
     BinaryElementwiseSpec,
     BinaryElementwiseType,
-    LeakyRELUType,
-    ELUType,
 )

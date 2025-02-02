@@ -2,23 +2,23 @@ from dataclasses import dataclass
 from typing import Callable, Dict, List, Tuple, Union
 import torch
 
+from ..op_converter import OpConverter
 from ...ir.safe_ir import (
     OpType,
     DataType,
+    ScalarType,
     TensorSpec,
+    TensorType,
     BinaryElementwiseType,
     BinaryElementwiseSpec,
     UnaryElementwiseSpec,
     UnaryElementwiseType,
-    LeakyRELUType,
-    ELUType,
 )
 
 ATEN_TO_UNARY_ELEMENTWISE_SPEC = {
-    "aten::abs": UnaryElementwiseSpec.ABS,
+    "aten::abs": UnaryElementwiseSpec.ABSOLUTE_VALUE,
     "aten::neg": UnaryElementwiseSpec.NEGATIVE,
     "aten::sqrt": UnaryElementwiseSpec.SQUARE_ROOT,
-    "aten::square": UnaryElementwiseSpec.SQUARE,
     "aten::exp": UnaryElementwiseSpec.EXP,
     "aten::log": UnaryElementwiseSpec.LOG,
     "aten::sin": UnaryElementwiseSpec.SIN,
@@ -33,8 +33,6 @@ ATEN_TO_UNARY_ELEMENTWISE_SPEC = {
     "aten::asinh": UnaryElementwiseSpec.ARCSINH,
     "aten::acosh": UnaryElementwiseSpec.ARCCOSH,
     "aten::atanh": UnaryElementwiseSpec.ARCTANH,
-    "aten::relu": UnaryElementwiseSpec.RELU,
-    "aten::selu": UnaryElementwiseSpec.SELU,
 }
 
 
@@ -47,10 +45,10 @@ class ConversionContext:
     debug_sources: Union[None, List[Tuple[str, str, str]]]
 
 
-class TorchOpConverter:
+class TorchOpConverter(OpConverter):
     def __init__(self):
         self._converters: Dict[
-            str, Callable[[ConversionContext], List[Tuple[str, OpType]]]
+            str, Tuple[List[OpType], Dict[str, Union[ScalarType, TensorType]]]
         ] = {}
         self._register_converters()
 
@@ -58,8 +56,9 @@ class TorchOpConverter:
         self._converters.update(
             {
                 "aten::add": self._convert_add,
+                "aten::relu": self._convert_relu,
                 "aten::leaky_relu": self._convert_leaky_relu,
-                "aten::elu": self._convert_elu,
+                "aten::softplus": self._convert_softplus,
             }
         )
 
@@ -77,7 +76,7 @@ class TorchOpConverter:
         output_value_to_node: Dict[torch._C.Value, torch._C.Node],
         output_value_to_name: Dict[torch._C.Value, str],
         debug_sources: Union[None, List[Tuple[str, str, str]]] = [],
-    ) -> List[Tuple[str, OpType]]:
+    ) -> Tuple[List[OpType], Dict[str, Union[ScalarType, TensorType]]]:
         ctx = ConversionContext(
             torch_op,
             forward_graph,
@@ -85,12 +84,11 @@ class TorchOpConverter:
             output_value_to_name,
             debug_sources,
         )
-
         if torch_op.kind() not in self._converters:
             raise Exception(f"Unsupported operation type: {torch_op.kind()}")
 
         return self._converters[torch_op.kind()](ctx)
-
+    
     def _inputs_to_names(self, ctx: ConversionContext) -> List[str]:
         input_names = []
         for input_value in ctx.torch_op.inputs():
@@ -131,7 +129,7 @@ class TorchOpConverter:
 
         return input_scalar_values
 
-    def _convert_add(self, ctx: ConversionContext) -> List[OpType]:
+    def _convert_add(self, ctx: ConversionContext) -> Tuple[List[OpType], Dict[str, Union[ScalarType, TensorType]]]:
         clean_input_names = self._inputs_to_names(ctx)
 
         # torch add unintuitively has 3 inputs a, b, and alpha for a + alpha*b
@@ -146,9 +144,9 @@ class TorchOpConverter:
             debug_sources=ctx.debug_sources,
         )
 
-        return [add_op]
+        return [add_op], {}
 
-    def _convert_unary_elementwise(self, ctx: ConversionContext) -> List[OpType]:
+    def _convert_unary_elementwise(self, ctx: ConversionContext) -> Tuple[List[OpType], Dict[str, Union[ScalarType, TensorType]]]:
         clean_input_names = self._inputs_to_names(ctx)
 
         out_name = ctx.torch_op.output().debugName().replace(".", "_")
@@ -159,34 +157,34 @@ class TorchOpConverter:
             debug_sources=ctx.debug_sources,
         )
 
-        return [unary_op]
+        return [unary_op], {}
     
-    def _convert_leaky_relu(self, ctx: ConversionContext) -> List[OpType]:
+    def _convert_relu(self, ctx: ConversionContext) -> Tuple[List[OpType], Dict[str, Union[ScalarType, TensorType]]]:
         clean_input_names = self._inputs_to_names(ctx)
-
         out_name = ctx.torch_op.output().debugName().replace(".", "_")
-        leaky_relu_op = LeakyRELUType(
-            name=out_name,
-            inputs={
-                "input": clean_input_names[0],
-                "negative_slope": clean_input_names[1],
-            },
-            debug_sources=ctx.debug_sources,
+        return self._create_relu(
+            out_name, 
+            clean_input_names[0],
+            debug_sources=ctx.debug_sources
         )
-
-        return [leaky_relu_op]
-
-    def _convert_elu(self, ctx: ConversionContext) -> List[OpType]:
+    
+    def _convert_leaky_relu(self, ctx: ConversionContext) -> Tuple[List[OpType], Dict[str, Union[ScalarType, TensorType]]]:
         clean_input_names = self._inputs_to_names(ctx)
-
         out_name = ctx.torch_op.output().debugName().replace(".", "_")
-        elu_op = ELUType(
-            name=out_name,
-            inputs={
-                "input": clean_input_names[0],
-                "alpha": clean_input_names[1]
-            },
-            debug_sources=ctx.debug_sources,
+        return self._create_leaky_relu(
+            out_name, 
+            clean_input_names[0],
+            clean_input_names[1],
+            debug_sources=ctx.debug_sources
         )
-
-        return [elu_op]
+    
+    def _convert_softplus(self, ctx: ConversionContext) -> Tuple[List[OpType], Dict[str, Union[ScalarType, TensorType]]]:
+        clean_input_names = self._inputs_to_names(ctx)
+        out_name = ctx.torch_op.output().debugName().replace(".", "_")
+        return self._create_softplus(
+            out_name, 
+            clean_input_names[0],
+            clean_input_names[1],
+            debug_sources=ctx.debug_sources
+        )
+        

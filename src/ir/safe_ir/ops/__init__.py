@@ -5,5 +5,3 @@ from .reduce_type import ReduceSpec, ReduceType
 from .fold_type import FoldSpec, FoldType
 from .unary_elementwise_type import UnaryElementwiseSpec, UnaryElementwiseType
 from .binary_elementwise_type import BinaryElementwiseSpec, BinaryElementwiseType
-from .leaky_relu_type import LeakyRELUType
-from .elu_type import ELUType

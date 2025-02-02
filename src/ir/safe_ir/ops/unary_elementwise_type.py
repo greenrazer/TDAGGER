@@ -4,10 +4,10 @@ from .op_type import OpType
 
 
 class UnaryElementwiseSpec(Enum):
-    ABS = auto()
+    ABSOLUTE_VALUE = auto()
     NEGATIVE = auto()
+    INVERSE = auto()
     SQUARE_ROOT = auto()
-    SQUARE = auto()
     EXP = auto()
     LOG = auto()
 
@@ -24,20 +24,16 @@ class UnaryElementwiseSpec(Enum):
     ARCCOSH = auto()
     ARCTANH = auto()
 
-    RELU = auto()
-    SELU = auto()
-    GELU = auto()
-
     def __str__(self):
         match self:
-            case self.ABS:
+            case self.ABSOLUTE_VALUE:
                 return "abs"
             case self.NEGATIVE:
                 return "negative"
+            case self.INVERSE:
+                return "inverse"
             case self.SQUARE_ROOT:
                 return "square_root"
-            case self.SQUARE:
-                return "square"
             case self.EXP:
                 return "exp"
             case self.LOG:
@@ -67,11 +63,6 @@ class UnaryElementwiseSpec(Enum):
                 return "arccosh"
             case self.ARCTANH:
                 return "arctanh"
-            
-            case self.RELU:
-                return "relu"
-            case self.SELU:
-                return "selu"
 
 
 class UnaryElementwiseType(OpType):

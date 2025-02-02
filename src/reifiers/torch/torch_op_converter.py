@@ -2,14 +2,13 @@ from dataclasses import dataclass
 from typing import Callable, Dict, List, Tuple, Union
 import torch
 
-from ...ir.safe_ir import OpType, UnaryElementwiseSpec
+from ...ir.safe_ir import OpType, UnaryElementwiseSpec, BinaryElementwiseSpec
 from ...graph.dag_graph import DAGGraph
 
 UNARY_ELEMENTWISE_SPEC_TO_ATEN = {
-   str(UnaryElementwiseSpec.ABS): "aten::abs",
+   str(UnaryElementwiseSpec.ABSOLUTE_VALUE): "aten::abs",
    str(UnaryElementwiseSpec.NEGATIVE): "aten::neg",
    str(UnaryElementwiseSpec.SQUARE_ROOT): "aten::sqrt",
-   str(UnaryElementwiseSpec.SQUARE): "aten::square", 
    str(UnaryElementwiseSpec.EXP): "aten::exp",
    str(UnaryElementwiseSpec.LOG): "aten::log",
 
@@ -25,9 +24,13 @@ UNARY_ELEMENTWISE_SPEC_TO_ATEN = {
    str(UnaryElementwiseSpec.ARCSINH): "aten::asinh",
    str(UnaryElementwiseSpec.ARCCOSH): "aten::acosh",
    str(UnaryElementwiseSpec.ARCTANH): "aten::atanh",
+}
 
-   str(UnaryElementwiseSpec.RELU): "aten::relu",
-   str(UnaryElementwiseSpec.SELU): "aten::selu",
+BINARY_ELEMENTWISE_SPEC_TO_ATEN = {
+   str(BinaryElementwiseSpec.ADD): "aten::add",
+   str(BinaryElementwiseSpec.SUBTRACT): "aten::sub",
+   str(BinaryElementwiseSpec.MULTIPLY): "aten::multiply",
+   str(BinaryElementwiseSpec.DIVIDE): "aten::div",
 }
 
 @dataclass
@@ -50,11 +53,10 @@ class TorchOpConverter:
 
     def _register_converters(self):
         """Register all conversion functions."""
+
         self._converters.update({
-            "binary_add": self._convert_add,
-            "binary_multiply": self._convert_multiply,
-            "leaky_relu": self._convert_leaky_relu,
-            "elu": self._convert_elu,
+            key: self._convert_binary_elementwise
+            for key in BINARY_ELEMENTWISE_SPEC_TO_ATEN.keys()
         })
 
         self._converters.update({
@@ -75,31 +77,44 @@ class TorchOpConverter:
             raise Exception(f"Unsupported operation type: {op.type}")
 
         return self._converters[op.type](ctx)
-
-    def _convert_add(self, ctx: ConversionContext) -> List[torch._C.Node]:
-        node = ctx.torch_graph.create("aten::add")
-
-        input_0_val = ctx.name_to_output_value[ctx.op.inputs["input_0"]]
-        input_1_val = ctx.name_to_output_value[ctx.op.inputs["input_1"]]
-
-        node.addInput(input_0_val)
-        node.addInput(input_1_val)
-        # add has a weird alpha parameter for a + alpha*b
-        node.addInput(ctx.torch_graph.insertConstant(1))
-        
-        node.output().setType(torch._C.TensorType.get())
-        return [node]
-
-    def _convert_multiply(self, ctx: ConversionContext) -> List[torch._C.Node]:
-        node = ctx.torch_graph.create("aten::multiply")
+    
+    def _convert_binary_elementwise(self, ctx: ConversionContext) -> List[torch._C.Node]:
 
         input_0_val = ctx.name_to_output_value[ctx.op.inputs["input_0"]]
         input_1_val = ctx.name_to_output_value[ctx.op.inputs["input_1"]]
 
-        node.addInput(input_0_val)
-        node.addInput(input_1_val)
+        match (input_0_val.type().kind(), input_1_val.type().kind(), ctx.op.spec):
+            case (_, _, BinaryElementwiseSpec.MULTIPLY):
+                node = ctx.torch_graph.create("aten::mul")
+            case _:
+                node = ctx.torch_graph.create(BINARY_ELEMENTWISE_SPEC_TO_ATEN[ctx.op.type])
 
-        node.output().setType(torch._C.TensorType.get())
+
+        # print(ctx.op.name, list(ctx.op.inputs.values()))
+        # print((input_0_val.type().kind(), input_1_val.type().kind(), ctx.op.spec))
+        match (input_0_val.type().kind(), input_1_val.type().kind(), ctx.op.spec):
+            case ("TensorType", _, BinaryElementwiseSpec.ADD):
+                node.addInput(input_0_val)
+                node.addInput(input_1_val)
+                node.addInput(ctx.torch_graph.insertConstant(1))
+            case (_, "TensorType", BinaryElementwiseSpec.ADD):
+                node.addInput(input_1_val)
+                node.addInput(input_0_val)
+                node.addInput(ctx.torch_graph.insertConstant(1))
+            case ("TensorType", _, BinaryElementwiseSpec.MULTIPLY):
+                node.addInput(input_0_val)
+                node.addInput(input_1_val)
+            case (_, "TensorType", BinaryElementwiseSpec.MULTIPLY):
+                node.addInput(input_1_val)
+                node.addInput(input_0_val)
+            case ("TensorType", "TensorType", _):
+                node.addInput(input_0_val)
+                node.addInput(input_1_val)
+            case (_, _, _):
+                node.addInput(input_0_val)
+                node.addInput(input_1_val)
+                node.output().setType(input_0_val.type())
+
         return [node]
     
     def _convert_unary_elementwise(self, ctx: ConversionContext) -> List[torch._C.Node]:
@@ -107,35 +122,28 @@ class TorchOpConverter:
 
         input_val = ctx.name_to_output_value[ctx.op.inputs["input"]]
 
-        node.addInput(input_val)
+        if input_val.type().kind() != "TensorType":
+            
+            # in -> in_tensor
+            num_to_tensor_node = ctx.torch_graph.create("aten::scalar_tensor")
+            num_to_tensor_node.addInput(input_val)
+            num_to_tensor_node.addInput(ctx.torch_graph.insertConstant(2))  
+            num_to_tensor_node.addInput(ctx.torch_graph.insertConstant(None))
+            num_to_tensor_node.addInput(ctx.torch_graph.insertConstant(None))
+            num_to_tensor_node.addInput(ctx.torch_graph.insertConstant(None))
 
-        node.output().setType(torch._C.TensorType.get())
+            # in_tensor -> op_tensor
+            node.addInput(num_to_tensor_node.output())
 
-        return [node]
+            # op_tensor -> op
+            tensor_to_num_node = ctx.torch_graph.create("aten::item")
+            tensor_to_num_node.addInput(node.output())
+            tensor_to_num_node.output().setType(torch._C.FloatType.get())
 
-    def _convert_leaky_relu(self, ctx: ConversionContext) -> List[OpType]:
-        node = ctx.torch_graph.create("aten::leaky_relu")
+            out = [num_to_tensor_node, node, tensor_to_num_node]
+        else:
+            node.addInput(input_val)
+            node.output().setType(torch._C.TensorType.get())
+            out = [node]
 
-        input_val = ctx.name_to_output_value[ctx.op.inputs["input"]]
-        negative_slope_val = ctx.name_to_output_value[ctx.op.inputs["negative_slope"]]
-
-        node.addInput(input_val)
-        node.addInput(negative_slope_val)
-
-        node.output().setType(torch._C.TensorType.get())
-
-        return [node]
-    
-    def _convert_elu(self, ctx: ConversionContext) -> List[OpType]:
-        node = ctx.torch_graph.create("aten::elu")
-
-        input_val = ctx.name_to_output_value[ctx.op.inputs["input"]]
-        alpha_val = ctx.name_to_output_value[ctx.op.inputs["alpha"]]
-
-        node.addInput(input_val)
-        node.addInput(alpha_val)
-        # aten::elu has two weird extra parameters scale, and input_scale, which similar to add are completely unnessisary
-        node.addInput(ctx.torch_graph.insertConstant(1))
-        node.addInput(ctx.torch_graph.insertConstant(1))
-
-        return [node]
+        return out

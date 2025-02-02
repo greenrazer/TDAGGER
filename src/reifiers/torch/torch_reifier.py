@@ -23,7 +23,8 @@ class TorchReifier(Reifier):
             module.register_parameter(name, param)
         for name, buffer in self._create_torch_buffers().items():
             module.register_buffer(name, buffer)
-        self.script_module = torch.jit.script(module)
+        self.script_module =  torch.jit.script(module)
+        # self.script_module = torch.ScriptModule("GraphModule", torch._C.CompilationUnit(), True)
 
         self.name_to_output_value: Dict[str, torch._C.Value] = {}
         self.op_converter = TorchOpConverter()
@@ -239,10 +240,12 @@ class TorchReifier(Reifier):
         script_function = torch._C._create_function_from_graph(
             "forward", self.torch_graph
         )
+        self.script_module._forward_function = script_function
+        # Attach the callable
+        self.script_module.forward = lambda *x: script_function(self.script_module, *x)
 
-        self.script_module.forward = lambda *x: script_function(
-            self.script_module, *x
-        )
+        # self.script_module.forward = lambda *x: script_function(self.script_module, *x)
 
+        # self.script_module._c._define("forward", script_function)
         return self.script_module
         
