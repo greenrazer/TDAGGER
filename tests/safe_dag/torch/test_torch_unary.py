@@ -1,4 +1,5 @@
 import unittest
+
 import torch
 import torch.nn as nn
 
@@ -42,23 +43,9 @@ class TestTorchUnary(unittest.TestCase):
         self.safe_dag = SafeDAG.from_torchscript(self.traced_model)
 
     def test_reconstructed_output(self):
-        print(self.safe_dag.graph)
-        # print(self.safe_dag.graph.name_registry.keys())
         out_model = self.safe_dag.to_torchscript()
-        # print(type(out_model))
-        # print(out_model.graph)
-        # print(out_model._c.graph)
-
-        # print(type(out_model))  # Let's see what type we're dealing with
-        # print(dir(out_model._c))
-
-        print(out_model._forward_function.graph)
-
-        # Try getting all methods
-        # print(out_model._c._method_names())  # This will show all available methods
-
-        # If there's a different method name, use that instead
-        # graph = out_model._c._get_method("forward").graph
+        # print(self.safe_dag.graph)
+        # print(out_model._forward_function.graph)
         # print(self.traced_model(self.example_input)[0, 0, 0, :10], out_model(self.example_input)[0, 0, 0, :10])
         self.assertTrue(
             torch.allclose(

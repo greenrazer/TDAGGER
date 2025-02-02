@@ -1,18 +1,19 @@
 from abc import ABC
 from dataclasses import dataclass
 from typing import Callable, Dict, List, Tuple, Union
+
 import torch
 
 from ..ir.safe_ir import (
+    BinaryElementwiseSpec,
+    BinaryElementwiseType,
     DataType,
     OpType,
-    ScalarType,
     ScalarSpec,
-    BinaryElementwiseType,
-    BinaryElementwiseSpec,
+    ScalarType,
+    TensorType,
     UnaryElementwiseSpec,
     UnaryElementwiseType,
-    TensorType,
 )
 
 
@@ -31,7 +32,7 @@ class OpConverter(ABC):
         )
 
         return [op], {one_name: one}
-    
+
     def _create_subtract_one(
         self, name: str, input: str, debug_sources=[], first=True
     ) -> Tuple[List[OpType], Dict[str, Union[TensorType, ScalarType]]]:
@@ -40,7 +41,9 @@ class OpConverter(ABC):
 
         op = BinaryElementwiseType(
             name=f"{name}",
-            inputs={"input_0": input, "input_1": one_name} if first else{"input_0": one_name, "input_1": input},
+            inputs={"input_0": input, "input_1": one_name}
+            if first
+            else {"input_0": one_name, "input_1": input},
             spec=BinaryElementwiseSpec.SUBTRACT,
             debug_sources=debug_sources,
         )

@@ -4,9 +4,9 @@ from typing import Dict, List, Union
 import torch
 
 from ...graph.dag_graph_builder import DAGGraphBuilder
+from ...ir.safe_ir import DataType, ScalarSpec, ScalarType, TensorSpec, TensorType
 from ..canonicalizer import Canonicalizer
 from .torch_op_converter import TorchOpConverter
-from ...ir.safe_ir import ScalarSpec, ScalarType, TensorSpec, TensorType, DataType
 
 
 class TorchCanonicalizer(Canonicalizer):
@@ -265,7 +265,8 @@ class TorchCanonicalizer(Canonicalizer):
     def _all_inputs_processed(self, node):
         return all(
             [
-                self.output_value_to_node[input_val] is None or self.output_value_to_node[input_val] in self.processed_nodes
+                self.output_value_to_node[input_val] is None
+                or self.output_value_to_node[input_val] in self.processed_nodes
                 for input_val in node.inputs()
             ]
         )
@@ -284,7 +285,9 @@ class TorchCanonicalizer(Canonicalizer):
             graph_builder.add_buffer(name, value)
 
         nodes_to_process = {
-            node for node in self.forward_graph.nodes() if node not in self.processed_nodes
+            node
+            for node in self.forward_graph.nodes()
+            if node not in self.processed_nodes
         }
         while nodes_to_process:
             ready_nodes = {
@@ -296,25 +299,34 @@ class TorchCanonicalizer(Canonicalizer):
                 for r in remaining_nodes:
                     print(r)
                     for input_val in r.inputs():
-                        print("     ", input_val, self.output_value_to_node[input_val], self.output_value_to_node[input_val] in self.processed_nodes)
+                        print(
+                            "     ",
+                            input_val,
+                            self.output_value_to_node[input_val],
+                            self.output_value_to_node[input_val]
+                            in self.processed_nodes,
+                        )
                 if remaining_nodes:
                     raise Exception(
                         "Graph creation failed: All remaining unprocessed nodes have at least one unprocessed input."
                     )
                 else:
                     break
-            
+
             for node in ready_nodes:
                 debug_source = self._process_debug_source(node.sourceRange())
                 safe_ops, consts = self.op_converter.convert_op(
-                    node, self.forward_graph, self.output_value_to_node, self.output_value_to_name, debug_source
+                    node,
+                    self.forward_graph,
+                    self.output_value_to_node,
+                    self.output_value_to_name,
+                    debug_source,
                 )
                 for const_name, const in consts.items():
                     graph_builder.add_constant(const_name, const)
-                
+
                 for safe_op in safe_ops:
                     graph_builder.add_op(safe_op.name, safe_op)
-
 
                 self.processed_nodes.add(node)
                 nodes_to_process.remove(node)

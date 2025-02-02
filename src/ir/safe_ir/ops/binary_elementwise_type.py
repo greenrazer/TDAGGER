@@ -1,5 +1,6 @@
 from enum import Enum, auto
 from typing import Dict, List, Tuple, Union
+
 from .op_type import OpType
 
 
@@ -46,7 +47,7 @@ class BinaryElementwiseType(OpType):
         if len(self.debug_sources) > 0:
             out += f' #{self.debug_sources[0][2]}( "{self.debug_sources[0][0]}", line {self.debug_sources[0][1]} )'
         return out
-    
+
     @property
     def type(self) -> str:
         return f"{self.spec}"

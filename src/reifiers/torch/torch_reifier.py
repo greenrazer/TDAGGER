@@ -1,8 +1,7 @@
 from typing import Dict
+
 import torch
 
-from .torch_op_converter import TorchOpConverter
-from ..reifier import Reifier
 from ...ir.safe_ir import (
     DataType,
     ScalarSpec,
@@ -10,6 +9,9 @@ from ...ir.safe_ir import (
     TensorSpec,
     TensorType,
 )
+from ..reifier import Reifier
+from .torch_op_converter import TorchOpConverter
+
 
 class TorchReifier(Reifier):
     def __init__(self, graph):
@@ -24,7 +26,6 @@ class TorchReifier(Reifier):
         for name, buffer in self._create_torch_buffers().items():
             module.register_buffer(name, buffer)
         self.script_module =  torch.jit.script(module)
-        # self.script_module = torch.ScriptModule("GraphModule", torch._C.CompilationUnit(), True)
 
         self.name_to_output_value: Dict[str, torch._C.Value] = {}
         self.op_converter = TorchOpConverter()
@@ -213,12 +214,12 @@ class TorchReifier(Reifier):
 
             if not ready_ops:
                 remaining_ops = ops_to_process - self.processed_ops
-                for r in remaining_ops:
-                    op_debug = self.ir_graph.ops[r]
-                    print(op_debug)
-                    for input_val in op_debug.inputs:
-                        print("     ", input_val)
                 if remaining_ops:
+                    for r in remaining_ops:
+                        op_debug = self.ir_graph.ops[r]
+                        print(op_debug)
+                        for input_val in op_debug.inputs:
+                            print("     ", input_val)
                     raise Exception(
                         "Graph creation failed: All remaining unprocessed ops have at least one unprocessed input."
                     )
@@ -241,11 +242,6 @@ class TorchReifier(Reifier):
             "forward", self.torch_graph
         )
         self.script_module._forward_function = script_function
-        # Attach the callable
         self.script_module.forward = lambda *x: script_function(self.script_module, *x)
-
-        # self.script_module.forward = lambda *x: script_function(self.script_module, *x)
-
-        # self.script_module._c._define("forward", script_function)
         return self.script_module
         

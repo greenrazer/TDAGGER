@@ -1,19 +1,20 @@
 from dataclasses import dataclass
 from typing import Callable, Dict, List, Tuple, Union
+
 import torch
 
-from ..op_converter import OpConverter
 from ...ir.safe_ir import (
-    OpType,
+    BinaryElementwiseSpec,
+    BinaryElementwiseType,
     DataType,
+    OpType,
     ScalarType,
     TensorSpec,
     TensorType,
-    BinaryElementwiseType,
-    BinaryElementwiseSpec,
     UnaryElementwiseSpec,
     UnaryElementwiseType,
 )
+from ..op_converter import OpConverter
 
 ATEN_TO_UNARY_ELEMENTWISE_SPEC = {
     "aten::abs": UnaryElementwiseSpec.ABSOLUTE_VALUE,
@@ -88,7 +89,7 @@ class TorchOpConverter(OpConverter):
             raise Exception(f"Unsupported operation type: {torch_op.kind()}")
 
         return self._converters[torch_op.kind()](ctx)
-    
+
     def _inputs_to_names(self, ctx: ConversionContext) -> List[str]:
         input_names = []
         for input_value in ctx.torch_op.inputs():
@@ -129,11 +130,13 @@ class TorchOpConverter(OpConverter):
 
         return input_scalar_values
 
-    def _convert_add(self, ctx: ConversionContext) -> Tuple[List[OpType], Dict[str, Union[ScalarType, TensorType]]]:
+    def _convert_add(
+        self, ctx: ConversionContext
+    ) -> Tuple[List[OpType], Dict[str, Union[ScalarType, TensorType]]]:
         clean_input_names = self._inputs_to_names(ctx)
 
         # torch add unintuitively has 3 inputs a, b, and alpha for a + alpha*b
-        # I will ignore the alpha parameter beacuse it is not nessisary, 
+        # I will ignore the alpha parameter beacuse it is not nessisary,
         # and if someone is using it they are doing something wrong
         out_name = ctx.torch_op.output().debugName().replace(".", "_")
 
@@ -146,7 +149,9 @@ class TorchOpConverter(OpConverter):
 
         return [add_op], {}
 
-    def _convert_unary_elementwise(self, ctx: ConversionContext) -> Tuple[List[OpType], Dict[str, Union[ScalarType, TensorType]]]:
+    def _convert_unary_elementwise(
+        self, ctx: ConversionContext
+    ) -> Tuple[List[OpType], Dict[str, Union[ScalarType, TensorType]]]:
         clean_input_names = self._inputs_to_names(ctx)
 
         out_name = ctx.torch_op.output().debugName().replace(".", "_")
@@ -158,33 +163,36 @@ class TorchOpConverter(OpConverter):
         )
 
         return [unary_op], {}
-    
-    def _convert_relu(self, ctx: ConversionContext) -> Tuple[List[OpType], Dict[str, Union[ScalarType, TensorType]]]:
+
+    def _convert_relu(
+        self, ctx: ConversionContext
+    ) -> Tuple[List[OpType], Dict[str, Union[ScalarType, TensorType]]]:
         clean_input_names = self._inputs_to_names(ctx)
         out_name = ctx.torch_op.output().debugName().replace(".", "_")
         return self._create_relu(
-            out_name, 
-            clean_input_names[0],
-            debug_sources=ctx.debug_sources
+            out_name, clean_input_names[0], debug_sources=ctx.debug_sources
         )
-    
-    def _convert_leaky_relu(self, ctx: ConversionContext) -> Tuple[List[OpType], Dict[str, Union[ScalarType, TensorType]]]:
+
+    def _convert_leaky_relu(
+        self, ctx: ConversionContext
+    ) -> Tuple[List[OpType], Dict[str, Union[ScalarType, TensorType]]]:
         clean_input_names = self._inputs_to_names(ctx)
         out_name = ctx.torch_op.output().debugName().replace(".", "_")
         return self._create_leaky_relu(
-            out_name, 
+            out_name,
             clean_input_names[0],
             clean_input_names[1],
-            debug_sources=ctx.debug_sources
+            debug_sources=ctx.debug_sources,
         )
-    
-    def _convert_softplus(self, ctx: ConversionContext) -> Tuple[List[OpType], Dict[str, Union[ScalarType, TensorType]]]:
+
+    def _convert_softplus(
+        self, ctx: ConversionContext
+    ) -> Tuple[List[OpType], Dict[str, Union[ScalarType, TensorType]]]:
         clean_input_names = self._inputs_to_names(ctx)
         out_name = ctx.torch_op.output().debugName().replace(".", "_")
         return self._create_softplus(
-            out_name, 
+            out_name,
             clean_input_names[0],
             clean_input_names[1],
-            debug_sources=ctx.debug_sources
+            debug_sources=ctx.debug_sources,
         )
-        
