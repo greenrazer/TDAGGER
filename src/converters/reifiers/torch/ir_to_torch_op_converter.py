@@ -4,7 +4,7 @@ from typing import Callable, Dict, List, Tuple, Union
 import torch
 
 from ....graph.dag_graph import DAGGraph
-from ....ir.safe_ir import BinaryElementwiseSpec, OpType, UnaryElementwiseSpec
+from ....ir.safe_ir import BinaryElementwiseSpec, OpType, UnaryElementwiseSpec, ReduceSpec
 from ...op_converter import OpConverter
 
 UNARY_ELEMENTWISE_SPEC_TO_ATEN = {
@@ -28,12 +28,19 @@ UNARY_ELEMENTWISE_SPEC_TO_ATEN = {
 }
 
 BINARY_ELEMENTWISE_SPEC_TO_ATEN = {
-    str(BinaryElementwiseSpec.ADD): "aten::add",
-    str(BinaryElementwiseSpec.SUBTRACT): "aten::sub",
-    str(BinaryElementwiseSpec.MULTIPLY): "aten::multiply",
-    str(BinaryElementwiseSpec.DIVIDE): "aten::div",
+    f"binary_{BinaryElementwiseSpec.ADD}": "aten::add",
+    f"binary_{BinaryElementwiseSpec.SUBTRACT}": "aten::sub",
+    f"binary_{BinaryElementwiseSpec.MULTIPLY}": "aten::multiply",
+    f"binary_{BinaryElementwiseSpec.DIVIDE}": "aten::div",
 }
 
+REDUCE_SPEC_TO_ATEN = {
+    f"reduce_{ReduceSpec.ReductionType.SUM}": "aten::sum",
+    f"reduce_{ReduceSpec.ReductionType.MEAN}": "aten::mean",
+    f"reduce_{ReduceSpec.ReductionType.MAX}": "aten::amax",
+    f"reduce_{ReduceSpec.ReductionType.MIN}": "aten::amin",
+    f"reduce_{ReduceSpec.ReductionType.PROD}": "aten::prod",
+}
 
 @dataclass
 class ConversionContext:
@@ -65,6 +72,13 @@ class IRToTorchOpConverter(OpConverter[ConversionContext, Callable, OpType, List
             }
         )
 
+        self._converters.update(
+            {
+                key: self._convert_reduce
+                for key in REDUCE_SPEC_TO_ATEN.keys()
+            }
+        )
+
     def _create_context(
         self,
         op: OpType,
@@ -76,6 +90,17 @@ class IRToTorchOpConverter(OpConverter[ConversionContext, Callable, OpType, List
 
     def _get_operation_key(self, op: OpType) -> str:
         return op.type
+
+    def _convert_permute(self, ctx: ConversionContext):
+        node = ctx.torch_graph.create("aten::permute")
+
+        input_val = ctx.name_to_output_value[ctx.op.inputs["input"]]
+
+        node.addInput(input_val)
+        node.addInput(ctx.torch_graph.insertConstant(ctx.op.spec.new_permutation))
+        node.output().setType(torch._C.TensorType.get())
+
+        return [node]
 
     def _convert_binary_elementwise(
         self, ctx: ConversionContext
@@ -149,15 +174,41 @@ class IRToTorchOpConverter(OpConverter[ConversionContext, Callable, OpType, List
             out = [node]
 
         return out
-
-    def _convert_permute(self, ctx: ConversionContext):
-        node = ctx.torch_graph.create("aten::permute")
-
+    
+    def _convert_reduce(self, ctx: ConversionContext):
         input_val = ctx.name_to_output_value[ctx.op.inputs["input"]]
+        reduction_dims = ctx.op.spec.reduce_dimensions
+        squeeze_dims = ctx.op.spec.squeeze_dimensions
+        if len(squeeze_dims) > 0 and reduction_dims != squeeze_dims:
+                raise Exception("Pytorch cannot keep only some reduced dims only all or nothing.")
+        
+        const_true = ctx.torch_graph.insertConstant(True)
+        const_none = ctx.torch_graph.insertConstant(None)
+        
+        if ctx.op.type == "reduce_prod":
+            out_nodes = []
+            for r in reduction_dims:
+                node = ctx.torch_graph.create(REDUCE_SPEC_TO_ATEN[ctx.op.type])
+                node.addInput(input_val)
+                node.addInput(ctx.torch_graph.insertConstant(r))
+                node.addInput(const_true)
+                node.addInput(const_none)
+                input_val = node.output()
+                out_nodes.append(node)
 
-        node.addInput(input_val)
-        node.addInput(ctx.torch_graph.insertConstant(ctx.op.spec.new_permutation))
-        node.output().setType(torch._C.TensorType.get())
+            if len(squeeze_dims) > 0:
+                node = ctx.torch_graph.create("aten::squeeze")
+                node.addInput(input_val)
+                out_nodes.append(node)
+            return out_nodes
+        else:
+            keep_dims = ctx.torch_graph.insertConstant(True if len(squeeze_dims) == 0 else False)
+            node = ctx.torch_graph.create(REDUCE_SPEC_TO_ATEN[ctx.op.type])
 
-        return [node]
+            node.addInput(input_val)
+            node.addInput(ctx.torch_graph.insertConstant(reduction_dims))
+            node.addInput(keep_dims)
+            if ctx.op.type in ["reduce_sum", "reduce_mean"]:
+                node.addInput(const_none) #for some reason sum has an output dtype
 
+            return [node]

@@ -14,5 +14,7 @@ from .ops import (
     BinaryElementwiseSpec,
     BinaryElementwiseType,
     PermuteSpec,
-    PermuteType
+    PermuteType,
+    ReduceSpec,
+    ReduceType
 )

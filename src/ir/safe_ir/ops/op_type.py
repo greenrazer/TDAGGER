@@ -21,7 +21,11 @@ class OpType(ABC):
         self.unique_indices = set()
         self._process_inputs()
         self.debug_sources = debug_sources
-        self.assert_valid()
+
+    def __post_init__(self):
+        for s in self.required_input_keys:
+            if s not in self.inputs:
+                raise Exception(f"Validation Failed: {s} not found in inputs")
 
     def _process_inputs(self):
         for _, val in self.inputs.items():
@@ -39,11 +43,6 @@ class OpType(ABC):
             return f' #{self.debug_sources[0][2]}( "{self.debug_sources[0][0]}", line {self.debug_sources[0][1]} )'
         else:
             return ""
-    
-    def assert_valid(self):
-        for s in self.required_input_keys:
-            if s not in self.inputs:
-                raise Exception(f"Validation Failed: {s} not found in inputs")
 
     @property
     @abstractmethod

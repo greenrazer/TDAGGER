@@ -15,6 +15,8 @@ from ....ir.safe_ir import (
     UnaryElementwiseType,
     PermuteSpec,
     PermuteType,
+    ReduceSpec,
+    ReduceType,
 )
 from ..canon_op_converter import CanonOpConverter
 
@@ -43,6 +45,14 @@ ATEN_TO_BINARY_ELEMENTWISE_SPEC = {
     "aten::sub": BinaryElementwiseSpec.SUBTRACT,
     "aten::mul": BinaryElementwiseSpec.MULTIPLY,
     "aten::div": BinaryElementwiseSpec.DIVIDE,
+}
+
+ATEN_TO_REDUCE_SPEC_TYPE = {
+    "aten::sum": ReduceSpec.ReductionType.SUM,
+    "aten::mean": ReduceSpec.ReductionType.MEAN,
+    "aten::amax": ReduceSpec.ReductionType.MAX,
+    "aten::amin": ReduceSpec.ReductionType.MIN,
+    "aten::prod": ReduceSpec.ReductionType.PROD,
 }
 
 
@@ -82,6 +92,10 @@ class TorchToIROpConverter(
             }
         )
 
+        self._converters.update(
+            {key: self._convert_reduce for key in ATEN_TO_REDUCE_SPEC_TYPE.keys()}
+        )
+
     def _create_context(
         self,
         torch_op: torch._C.Node,
@@ -118,7 +132,7 @@ class TorchToIROpConverter(
     def _inputs_to_torch_types(self, ctx):
         return [i.type().kind() for i in ctx.torch_op.inputs()]
 
-    def _inputs_to_scalar_values(self, ctx):
+    def _inputs_constants_to_values(self, ctx):
         input_scalar_values = []
         for input_value in ctx.torch_op.inputs():
             node = ctx.output_value_to_node[input_value]
@@ -136,24 +150,80 @@ class TorchToIROpConverter(
                     input_scalar_values.append(node.s("value"))
                 case "BoolType":
                     input_scalar_values.append(bool(node.i("value")))
+                case "ListType":
+                    input_scalar_values.append(node.output().toIValue())
                 case _:
                     input_scalar_values.append(None)
 
         return input_scalar_values
+    
+
+    def _convert_relu(
+        self, ctx: ConversionContext
+    ) -> Tuple[List[OpType], Dict[str, Union[ScalarType, TensorType]]]:
+        out_name = ctx.torch_op.output().debugName().replace(".", "_")
+
+        input_names = self._inputs_to_names(ctx)
+        return self._create_relu(
+            out_name, input_names[0], debug_sources=ctx.debug_sources
+        )
+
+    def _convert_leaky_relu(
+        self, ctx: ConversionContext
+    ) -> Tuple[List[OpType], Dict[str, Union[ScalarType, TensorType]]]:
+        out_name = ctx.torch_op.output().debugName().replace(".", "_")
+
+        input_names = self._inputs_to_names(ctx)
+        return self._create_leaky_relu(
+            out_name,
+            input_names[0],
+            input_names[1],
+            debug_sources=ctx.debug_sources,
+        )
+
+    def _convert_softplus(
+        self, ctx: ConversionContext
+    ) -> Tuple[List[OpType], Dict[str, Union[ScalarType, TensorType]]]:
+        out_name = ctx.torch_op.output().debugName().replace(".", "_")
+
+        input_names = self._inputs_to_names(ctx)
+        return self._create_softplus(
+            out_name,
+            input_names[0],
+            input_names[1],
+            debug_sources=ctx.debug_sources,
+        )
+
+    def _convert_permute(
+        self, ctx: ConversionContext
+    ) -> Tuple[List[OpType], Dict[str, Union[ScalarType, TensorType]]]:
+        out_name = ctx.torch_op.output().debugName().replace(".", "_")
+
+        input_names = self._inputs_to_names(ctx)
+        input_constant_values = self._inputs_constants_to_values(ctx)
+
+        permute_op = PermuteType(
+            name=out_name,
+            inputs={"input": input_names[0]},
+            spec=PermuteSpec(new_permutation=input_constant_values[1]),
+            debug_sources=ctx.debug_sources,
+        )
+
+        return [permute_op], {}
 
     def _convert_binary_elementwise(
         self, ctx: ConversionContext
     ) -> Tuple[List[OpType], Dict[str, Union[ScalarType, TensorType]]]:
         out_name = ctx.torch_op.output().debugName().replace(".", "_")
 
-        clean_input_names = self._inputs_to_names(ctx)
+        input_names = self._inputs_to_names(ctx)
 
         # torch add unintuitively has 3 inputs a, b, and alpha for a + alpha*b
         # I will ignore the alpha parameter beacuse it is not nessisary,
         # and if someone is using it they are doing something wrong
         bin_op = BinaryElementwiseType(
             name=out_name,
-            inputs={"input_0": clean_input_names[0], "input_1": clean_input_names[1]},
+            inputs={"input_0": input_names[0], "input_1": input_names[1]},
             spec=ATEN_TO_BINARY_ELEMENTWISE_SPEC[ctx.torch_op.kind()],
             debug_sources=ctx.debug_sources,
         )
@@ -165,77 +235,41 @@ class TorchToIROpConverter(
     ) -> Tuple[List[OpType], Dict[str, Union[ScalarType, TensorType]]]:
         out_name = ctx.torch_op.output().debugName().replace(".", "_")
 
-        clean_input_names = self._inputs_to_names(ctx)
+        input_names = self._inputs_to_names(ctx)
 
         unary_op = UnaryElementwiseType(
             name=out_name,
-            inputs={"input": clean_input_names[0]},
+            inputs={"input": input_names[0]},
             spec=ATEN_TO_UNARY_ELEMENTWISE_SPEC[ctx.torch_op.kind()],
             debug_sources=ctx.debug_sources,
         )
 
         return [unary_op], {}
 
-    def _convert_relu(
+    def _convert_reduce(
         self, ctx: ConversionContext
     ) -> Tuple[List[OpType], Dict[str, Union[ScalarType, TensorType]]]:
         out_name = ctx.torch_op.output().debugName().replace(".", "_")
 
-        clean_input_names = self._inputs_to_names(ctx)
-        return self._create_relu(
-            out_name, clean_input_names[0], debug_sources=ctx.debug_sources
+        input_names = self._inputs_to_names(ctx)
+        input_types = self._inputs_to_torch_types(ctx)
+        input_constant_values = self._inputs_constants_to_values(ctx)
+
+        reduce_dimensions = input_constant_values[1] if input_types[1] == "ListType" else [input_constant_values[1]]
+        squeeze_dimensions = [] if input_constant_values[2] else reduce_dimensions
+
+        reduction_spec = ReduceSpec(
+            reduce_dimensions=reduce_dimensions,
+            squeeze_dimensions=squeeze_dimensions,
+            reduction_type=ATEN_TO_REDUCE_SPEC_TYPE[ctx.torch_op.kind()],
         )
 
-    def _convert_leaky_relu(
-        self, ctx: ConversionContext
-    ) -> Tuple[List[OpType], Dict[str, Union[ScalarType, TensorType]]]:
-        out_name = ctx.torch_op.output().debugName().replace(".", "_")
-
-        clean_input_names = self._inputs_to_names(ctx)
-        return self._create_leaky_relu(
+        reduction_op = ReduceType(
             out_name,
-            clean_input_names[0],
-            clean_input_names[1],
+            {"input": input_names[0]},
+            reduction_spec,
             debug_sources=ctx.debug_sources,
         )
 
-    def _convert_softplus(
-        self, ctx: ConversionContext
-    ) -> Tuple[List[OpType], Dict[str, Union[ScalarType, TensorType]]]:
-        out_name = ctx.torch_op.output().debugName().replace(".", "_")
+        return [reduction_op], {}
 
-        clean_input_names = self._inputs_to_names(ctx)
-        return self._create_softplus(
-            out_name,
-            clean_input_names[0],
-            clean_input_names[1],
-            debug_sources=ctx.debug_sources,
-        )
-
-    def _convert_permute(
-        self, ctx: ConversionContext
-    ) -> Tuple[List[OpType], Dict[str, Union[ScalarType, TensorType]]]:
-        out_name = ctx.torch_op.output().debugName().replace(".", "_")
-
-        clean_input_names = self._inputs_to_names(ctx)
-        clean_input_nodes = self._inputs_to_nodes(ctx)
-
-        new_permutation_value = clean_input_nodes[1].output()
-        if new_permutation_value.type().kind() != "ListType":
-            raise Exception(
-                f"Permute Index not ListType[int]: {new_permutation_value.type().kind()}"
-            )
-        if new_permutation_value.type().getElementType().kind() != "IntType":
-            raise Exception(
-                f"Permute Index not ListType[IntType]: ListType[{new_permutation_value.type().getElementType().kind()}."
-            )
-        new_permutation: List[int] = clean_input_nodes[1].output().toIValue()
-
-        permute_op = PermuteType(
-            name=out_name,
-            inputs={"input": clean_input_names[0]},
-            spec=PermuteSpec(new_permutation=new_permutation),
-            debug_sources=ctx.debug_sources,
-        )
-
-        return [permute_op], {}
