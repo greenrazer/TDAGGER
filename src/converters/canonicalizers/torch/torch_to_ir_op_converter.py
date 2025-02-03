@@ -13,6 +13,8 @@ from ....ir.safe_ir import (
     TensorType,
     UnaryElementwiseSpec,
     UnaryElementwiseType,
+    PermuteSpec,
+    PermuteType,
 )
 from ..canon_op_converter import CanonOpConverter
 
@@ -62,6 +64,7 @@ class TorchToIROpConverter(
                 "aten::relu": self._convert_relu,
                 "aten::leaky_relu": self._convert_leaky_relu,
                 "aten::softplus": self._convert_softplus,
+                "aten::permute": self._convert_permute,
             }
         )
 
@@ -141,13 +144,13 @@ class TorchToIROpConverter(
     def _convert_binary_elementwise(
         self, ctx: ConversionContext
     ) -> Tuple[List[OpType], Dict[str, Union[ScalarType, TensorType]]]:
+        out_name = ctx.torch_op.output().debugName().replace(".", "_")
+
         clean_input_names = self._inputs_to_names(ctx)
 
         # torch add unintuitively has 3 inputs a, b, and alpha for a + alpha*b
         # I will ignore the alpha parameter beacuse it is not nessisary,
         # and if someone is using it they are doing something wrong
-        out_name = ctx.torch_op.output().debugName().replace(".", "_")
-
         bin_op = BinaryElementwiseType(
             name=out_name,
             inputs={"input_0": clean_input_names[0], "input_1": clean_input_names[1]},
@@ -160,9 +163,10 @@ class TorchToIROpConverter(
     def _convert_unary_elementwise(
         self, ctx: ConversionContext
     ) -> Tuple[List[OpType], Dict[str, Union[ScalarType, TensorType]]]:
+        out_name = ctx.torch_op.output().debugName().replace(".", "_")
+
         clean_input_names = self._inputs_to_names(ctx)
 
-        out_name = ctx.torch_op.output().debugName().replace(".", "_")
         unary_op = UnaryElementwiseType(
             name=out_name,
             inputs={"input": clean_input_names[0]},
@@ -175,8 +179,9 @@ class TorchToIROpConverter(
     def _convert_relu(
         self, ctx: ConversionContext
     ) -> Tuple[List[OpType], Dict[str, Union[ScalarType, TensorType]]]:
-        clean_input_names = self._inputs_to_names(ctx)
         out_name = ctx.torch_op.output().debugName().replace(".", "_")
+
+        clean_input_names = self._inputs_to_names(ctx)
         return self._create_relu(
             out_name, clean_input_names[0], debug_sources=ctx.debug_sources
         )
@@ -184,8 +189,9 @@ class TorchToIROpConverter(
     def _convert_leaky_relu(
         self, ctx: ConversionContext
     ) -> Tuple[List[OpType], Dict[str, Union[ScalarType, TensorType]]]:
-        clean_input_names = self._inputs_to_names(ctx)
         out_name = ctx.torch_op.output().debugName().replace(".", "_")
+
+        clean_input_names = self._inputs_to_names(ctx)
         return self._create_leaky_relu(
             out_name,
             clean_input_names[0],
@@ -196,11 +202,40 @@ class TorchToIROpConverter(
     def _convert_softplus(
         self, ctx: ConversionContext
     ) -> Tuple[List[OpType], Dict[str, Union[ScalarType, TensorType]]]:
-        clean_input_names = self._inputs_to_names(ctx)
         out_name = ctx.torch_op.output().debugName().replace(".", "_")
+
+        clean_input_names = self._inputs_to_names(ctx)
         return self._create_softplus(
             out_name,
             clean_input_names[0],
             clean_input_names[1],
             debug_sources=ctx.debug_sources,
         )
+
+    def _convert_permute(
+        self, ctx: ConversionContext
+    ) -> Tuple[List[OpType], Dict[str, Union[ScalarType, TensorType]]]:
+        out_name = ctx.torch_op.output().debugName().replace(".", "_")
+
+        clean_input_names = self._inputs_to_names(ctx)
+        clean_input_nodes = self._inputs_to_nodes(ctx)
+
+        new_permutation_value = clean_input_nodes[1].output()
+        if new_permutation_value.type().kind() != "ListType":
+            raise Exception(
+                f"Permute Index not ListType[int]: {new_permutation_value.type().kind()}"
+            )
+        if new_permutation_value.type().getElementType().kind() != "IntType":
+            raise Exception(
+                f"Permute Index not ListType[IntType]: ListType[{new_permutation_value.type().getElementType().kind()}."
+            )
+        new_permutation: List[int] = clean_input_nodes[1].output().toIValue()
+
+        permute_op = PermuteType(
+            name=out_name,
+            inputs={"input": clean_input_names[0]},
+            spec=PermuteSpec(new_permutation=new_permutation),
+            debug_sources=ctx.debug_sources,
+        )
+
+        return [permute_op], {}

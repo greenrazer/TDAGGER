@@ -47,6 +47,12 @@ class IRToTorchOpConverter(OpConverter[ConversionContext, Callable, OpType, List
     def _register_converters(self):
         self._converters.update(
             {
+                "permute": self._convert_permute
+            }
+        )
+
+        self._converters.update(
+            {
                 key: self._convert_binary_elementwise
                 for key in BINARY_ELEMENTWISE_SPEC_TO_ATEN.keys()
             }
@@ -143,3 +149,15 @@ class IRToTorchOpConverter(OpConverter[ConversionContext, Callable, OpType, List
             out = [node]
 
         return out
+
+    def _convert_permute(self, ctx: ConversionContext):
+        node = ctx.torch_graph.create("aten::permute")
+
+        input_val = ctx.name_to_output_value[ctx.op.inputs["input"]]
+
+        node.addInput(input_val)
+        node.addInput(ctx.torch_graph.insertConstant(ctx.op.spec.new_permutation))
+        node.output().setType(torch._C.TensorType.get())
+
+        return [node]
+

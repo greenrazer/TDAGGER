@@ -9,16 +9,10 @@ from .safe_ir import (
 )
 from .ops import (
     OpType,
-    RearrangeSpec,
-    RearrangeType,
-    RepeatSpec,
-    RepeatType,
-    ReduceSpec,
-    ReduceType,
-    FoldSpec,
-    FoldType,
     UnaryElementwiseSpec, 
     UnaryElementwiseType,
     BinaryElementwiseSpec,
     BinaryElementwiseType,
+    PermuteSpec,
+    PermuteType
 )

@@ -34,6 +34,12 @@ class OpType(ABC):
             else:
                 raise Exception("inputs can only be a reference or list of references")
 
+    def debug_sources_to_str(self) -> str:
+        if len(self.debug_sources) > 0:
+            return f' #{self.debug_sources[0][2]}( "{self.debug_sources[0][0]}", line {self.debug_sources[0][1]} )'
+        else:
+            return ""
+    
     def assert_valid(self):
         for s in self.required_input_keys:
             if s not in self.inputs:
