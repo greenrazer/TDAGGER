@@ -3,3 +3,4 @@ from .unary_elementwise_type import UnaryElementwiseSpec, UnaryElementwiseType
 from .binary_elementwise_type import BinaryElementwiseSpec, BinaryElementwiseType
 from .permute_type import PermuteSpec, PermuteType
 from .reduce_type import ReduceSpec, ReduceType
+from .index_type import IndexSpec, IndexType

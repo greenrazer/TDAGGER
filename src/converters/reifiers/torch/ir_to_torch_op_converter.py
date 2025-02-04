@@ -54,7 +54,8 @@ class IRToTorchOpConverter(OpConverter[ConversionContext, Callable, OpType, List
     def _register_converters(self):
         self._converters.update(
             {
-                "permute": self._convert_permute
+                "permute": self._convert_permute,
+                "index": self._convert_index
             }
         )
 
@@ -101,6 +102,43 @@ class IRToTorchOpConverter(OpConverter[ConversionContext, Callable, OpType, List
         node.output().setType(torch._C.TensorType.get())
 
         return [node]
+    
+    def _convert_index(self, ctx: ConversionContext):
+        sorted_inds = sorted(ctx.op.spec.index.keys())
+
+        input_val = ctx.name_to_output_value[ctx.op.inputs["input"]]
+
+        num_removed = 0
+        nodes = []
+
+        for i in sorted_inds:
+            curr_val = ctx.op.spec.index[i]
+            if isinstance(curr_val, tuple):
+                node = ctx.torch_graph.create("aten::slice")
+
+                node.addInput(input_val)
+                node.addInput(ctx.torch_graph.insertConstant(i - num_removed))
+                node.addInput(ctx.torch_graph.insertConstant(curr_val[0]))
+                # from inclusive to exclusive end
+                if curr_val[1] == -1: # if to end of list replace with 2^63 - 1
+                    node.addInput(ctx.torch_graph.insertConstant(9223372036854775807))
+                else:
+                    node.addInput(ctx.torch_graph.insertConstant(curr_val[1] + 1))
+                node.addInput(ctx.torch_graph.insertConstant(curr_val[2]))
+            else:
+                node = ctx.torch_graph.create("aten::select")
+
+                node.addInput(input_val)
+                node.addInput(ctx.torch_graph.insertConstant(i - num_removed))
+                node.addInput(ctx.torch_graph.insertConstant(curr_val))
+
+                num_removed += 1
+
+            node.output().setType(torch._C.TensorType.get())
+
+            nodes.append(node)
+
+        return nodes
 
     def _convert_binary_elementwise(
         self, ctx: ConversionContext

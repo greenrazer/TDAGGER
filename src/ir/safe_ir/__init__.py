@@ -16,5 +16,7 @@ from .ops import (
     PermuteSpec,
     PermuteType,
     ReduceSpec,
-    ReduceType
+    ReduceType,
+    IndexSpec,
+    IndexType
 )
