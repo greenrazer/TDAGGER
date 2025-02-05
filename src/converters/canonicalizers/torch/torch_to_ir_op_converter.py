@@ -18,7 +18,10 @@ from ....ir.safe_ir import (
     ReduceSpec,
     ReduceType,
     IndexSpec,
-    IndexType
+    IndexType,
+    GroupSpec,
+    GroupType,
+    UngroupSpec,
 )
 from ..canon_op_converter import CanonOpConverter
 
@@ -73,17 +76,6 @@ class TorchToIROpConverter(
     def _register_converters(self):
         self._converters.update(
             {
-                "aten::relu": self._convert_relu,
-                "aten::leaky_relu": self._convert_leaky_relu,
-                "aten::softplus": self._convert_softplus,
-                "aten::permute": self._convert_permute,
-                "aten::slice": self._convert_index,
-                "aten::select": self._convert_index
-            }
-        )
-
-        self._converters.update(
-            {
                 key: self._convert_binary_elementwise
                 for key in ATEN_TO_BINARY_ELEMENTWISE_SPEC.keys()
             }
@@ -98,6 +90,18 @@ class TorchToIROpConverter(
 
         self._converters.update(
             {key: self._convert_reduce for key in ATEN_TO_REDUCE_SPEC_TYPE.keys()}
+        )
+
+        self._converters.update(
+            {
+                "aten::relu": self._convert_relu,
+                "aten::leaky_relu": self._convert_leaky_relu,
+                "aten::softplus": self._convert_softplus,
+                "aten::permute": self._convert_permute,
+                "aten::slice": self._convert_index,
+                "aten::select": self._convert_index,
+                "aten::reshape": self._convert_reshape,
+            }
         )
 
     def _create_context(
@@ -160,7 +164,72 @@ class TorchToIROpConverter(
                     input_scalar_values.append(None)
 
         return input_scalar_values
-    
+
+    def _convert_binary_elementwise(
+        self, ctx: ConversionContext
+    ) -> Tuple[List[OpType], Dict[str, Union[ScalarType, TensorType]]]:
+        out_name = ctx.torch_op.output().debugName().replace(".", "_")
+
+        input_names = self._inputs_to_names(ctx)
+
+        # torch add unintuitively has 3 inputs a, b, and alpha for a + alpha*b
+        # I will ignore the alpha parameter beacuse it is not nessisary,
+        # and if someone is using it they are doing something wrong
+        bin_op = BinaryElementwiseType(
+            name=out_name,
+            inputs={"input_0": input_names[0], "input_1": input_names[1]},
+            spec=ATEN_TO_BINARY_ELEMENTWISE_SPEC[ctx.torch_op.kind()],
+            debug_sources=ctx.debug_sources,
+        )
+
+        return [bin_op], {}
+
+    def _convert_unary_elementwise(
+        self, ctx: ConversionContext
+    ) -> Tuple[List[OpType], Dict[str, Union[ScalarType, TensorType]]]:
+        out_name = ctx.torch_op.output().debugName().replace(".", "_")
+
+        input_names = self._inputs_to_names(ctx)
+
+        unary_op = UnaryElementwiseType(
+            name=out_name,
+            inputs={"input": input_names[0]},
+            spec=ATEN_TO_UNARY_ELEMENTWISE_SPEC[ctx.torch_op.kind()],
+            debug_sources=ctx.debug_sources,
+        )
+
+        return [unary_op], {}
+
+    def _convert_reduce(
+        self, ctx: ConversionContext
+    ) -> Tuple[List[OpType], Dict[str, Union[ScalarType, TensorType]]]:
+        out_name = ctx.torch_op.output().debugName().replace(".", "_")
+
+        input_names = self._inputs_to_names(ctx)
+        input_types = self._inputs_to_torch_types(ctx)
+        input_constant_values = self._inputs_constants_to_values(ctx)
+
+        reduce_dimensions = (
+            input_constant_values[1]
+            if input_types[1] == "ListType"
+            else [input_constant_values[1]]
+        )
+        squeeze_dimensions = [] if input_constant_values[2] else reduce_dimensions
+
+        reduction_spec = ReduceSpec(
+            reduce_dimensions=reduce_dimensions,
+            squeeze_dimensions=squeeze_dimensions,
+            reduction_type=ATEN_TO_REDUCE_SPEC_TYPE[ctx.torch_op.kind()],
+        )
+
+        reduction_op = ReduceType(
+            out_name,
+            {"input": input_names[0]},
+            reduction_spec,
+            debug_sources=ctx.debug_sources,
+        )
+
+        return [reduction_op], {}
 
     def _convert_relu(
         self, ctx: ConversionContext
@@ -214,7 +283,7 @@ class TorchToIROpConverter(
         )
 
         return [permute_op], {}
-    
+
     def _convert_index(
         self, ctx: ConversionContext
     ) -> Tuple[List[OpType], Dict[str, Union[ScalarType, TensorType]]]:
@@ -223,93 +292,62 @@ class TorchToIROpConverter(
         input_names = self._inputs_to_names(ctx)
         input_constant_values = self._inputs_constants_to_values(ctx)
 
-        if ctx.torch_op.kind() == "aten::select": 
-            index_obj =  input_constant_values[2]
+        if ctx.torch_op.kind() == "aten::select":
+            index_obj = input_constant_values[2]
         elif ctx.torch_op.kind() == "aten::slice":
             # step can never be negitive in pytorch slices
-            match (input_constant_values[2], input_constant_values[3], input_constant_values[4]):
+            match (
+                input_constant_values[2],
+                input_constant_values[3],
+                input_constant_values[4],
+            ):
                 case (begin, 9223372036854775807, step):
                     index_obj = (begin, -1, step)
                 case (begin, end, step):
                     # end - 1 because inclusive indexing
-                    index_obj = (begin, end-1, step)
-        
-        index_spec = IndexSpec(
-            index= {
-                input_constant_values[1]: index_obj
-            }
-        )
-        
-        
+                    index_obj = (begin, end - 1, step)
+
+        index_spec = IndexSpec(index={input_constant_values[1]: index_obj})
+
         index_op = IndexType(
             out_name,
-            {
-                "input": input_names[0]
-            },
+            {"input": input_names[0]},
             index_spec,
             debug_sources=ctx.debug_sources,
         )
 
         return [index_op], {}
 
-    def _convert_binary_elementwise(
+    def _convert_reshape(
         self, ctx: ConversionContext
     ) -> Tuple[List[OpType], Dict[str, Union[ScalarType, TensorType]]]:
         out_name = ctx.torch_op.output().debugName().replace(".", "_")
-
         input_names = self._inputs_to_names(ctx)
-
-        # torch add unintuitively has 3 inputs a, b, and alpha for a + alpha*b
-        # I will ignore the alpha parameter beacuse it is not nessisary,
-        # and if someone is using it they are doing something wrong
-        bin_op = BinaryElementwiseType(
-            name=out_name,
-            inputs={"input_0": input_names[0], "input_1": input_names[1]},
-            spec=ATEN_TO_BINARY_ELEMENTWISE_SPEC[ctx.torch_op.kind()],
-            debug_sources=ctx.debug_sources,
-        )
-
-        return [bin_op], {}
-
-    def _convert_unary_elementwise(
-        self, ctx: ConversionContext
-    ) -> Tuple[List[OpType], Dict[str, Union[ScalarType, TensorType]]]:
-        out_name = ctx.torch_op.output().debugName().replace(".", "_")
-
-        input_names = self._inputs_to_names(ctx)
-
-        unary_op = UnaryElementwiseType(
-            name=out_name,
-            inputs={"input": input_names[0]},
-            spec=ATEN_TO_UNARY_ELEMENTWISE_SPEC[ctx.torch_op.kind()],
-            debug_sources=ctx.debug_sources,
-        )
-
-        return [unary_op], {}
-
-    def _convert_reduce(
-        self, ctx: ConversionContext
-    ) -> Tuple[List[OpType], Dict[str, Union[ScalarType, TensorType]]]:
-        out_name = ctx.torch_op.output().debugName().replace(".", "_")
-
-        input_names = self._inputs_to_names(ctx)
-        input_types = self._inputs_to_torch_types(ctx)
         input_constant_values = self._inputs_constants_to_values(ctx)
 
-        reduce_dimensions = input_constant_values[1] if input_types[1] == "ListType" else [input_constant_values[1]]
-        squeeze_dimensions = [] if input_constant_values[2] else reduce_dimensions
+        input_shape = ctx.torch_op.inputsAt(0).type().sizes()
+        output_shape = input_constant_values[1]
 
-        reduction_spec = ReduceSpec(
-            reduce_dimensions=reduce_dimensions,
-            squeeze_dimensions=squeeze_dimensions,
-            reduction_type=ATEN_TO_REDUCE_SPEC_TYPE[ctx.torch_op.kind()],
+        spec_list = GroupType.specs_from_reshape(input_shape, output_shape)
+
+        out = []
+        for s in spec_list[:-1]:
+            out.append(
+                GroupType(
+                    f"{out_name}_{s.type}",
+                    inputs={"input": input_names[0]},
+                    spec=s,
+                    debug_sources=ctx.debug_sources,
+                )
+            )
+
+        out.append(
+            GroupType(
+                f"{out_name}",
+                inputs={"input": input_names[0] if len(out) == 0 else out[-1].name},
+                spec=spec_list[-1],
+                debug_sources=ctx.debug_sources,
+            )
         )
 
-        reduction_op = ReduceType(
-            out_name,
-            {"input": input_names[0]},
-            reduction_spec,
-            debug_sources=ctx.debug_sources,
-        )
-
-        return [reduction_op], {}
+        return out, {}

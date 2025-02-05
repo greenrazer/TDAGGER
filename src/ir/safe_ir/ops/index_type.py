@@ -3,20 +3,22 @@ from enum import Enum, auto
 from typing import Dict, List, Tuple, Union, Set
 
 from .op_type import OpType
-    
+
 
 @dataclass
 class IndexSpec:
-    index: Dict[int, Union[int, Tuple[int, int, int]]] # slice end indexes are inclusive
+    index: Dict[
+        int, Union[int, Tuple[int, int, int]]
+    ]  # slice end indexes are inclusive
 
     def __str__(self):
         pos_dims = sorted([d for d in self.index if d >= 0])
         neg_dims = sorted([d for d in self.index if d < 0])
-        
+
         parts = []
         prev_included = False
         prev_num = None
-        
+
         # Process positive dimensions first
         if pos_dims:
             for i in range(pos_dims[0], pos_dims[-1] + 1):
@@ -48,14 +50,14 @@ class IndexSpec:
                 elif prev_included:
                     parts.append("...")
                     prev_included = False
-        
+
         # Then process negative dimensions
         if neg_dims:
             prev_included = False
             prev_num = None
             if parts and parts[-1] != "...":
                 parts.append("...")
-                
+
             for i in range(neg_dims[0], neg_dims[-1] - 1, -1):
                 if i in neg_dims:
                     if prev_included and parts[-1] != "..." and i != prev_num - 1:
@@ -84,16 +86,17 @@ class IndexSpec:
                 elif prev_included:
                     parts.append("...")
                     prev_included = False
-        
+
         # Add leading ellipsis if not starting at 0
         if not pos_dims or pos_dims[0] != 0:
             parts.insert(0, "...")
-        
+
         # Add trailing ellipsis if not ending in -1
         if not neg_dims or neg_dims[-1] != -1:
             parts.append("...")
-        
+
         return " ".join(parts)
+
 
 class IndexType(OpType):
     spec: IndexSpec

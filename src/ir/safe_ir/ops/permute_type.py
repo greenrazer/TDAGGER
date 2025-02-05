@@ -3,6 +3,7 @@ from typing import Dict, List, Tuple, Union
 
 from .op_type import OpType
 
+
 @dataclass
 class PermuteSpec:
     new_permutation: List[int]
@@ -10,6 +11,7 @@ class PermuteSpec:
     def __str__(self):
         original = list(range(len(self.new_permutation)))
         return f"{' '.join(map(str, original))} -> {' '.join(map(str, self.new_permutation))}"
+
 
 class PermuteType(OpType):
     spec: PermuteSpec

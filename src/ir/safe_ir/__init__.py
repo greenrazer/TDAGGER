@@ -18,5 +18,8 @@ from .ops import (
     ReduceSpec,
     ReduceType,
     IndexSpec,
-    IndexType
+    IndexType,
+    GroupSpec,
+    UngroupSpec,
+    GroupType,
 )

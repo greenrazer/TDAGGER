@@ -4,7 +4,12 @@ from typing import Callable, Dict, List, Tuple, Union
 import torch
 
 from ....graph.dag_graph import DAGGraph
-from ....ir.safe_ir import BinaryElementwiseSpec, OpType, UnaryElementwiseSpec, ReduceSpec
+from ....ir.safe_ir import (
+    BinaryElementwiseSpec,
+    OpType,
+    UnaryElementwiseSpec,
+    ReduceSpec,
+)
 from ...op_converter import OpConverter
 
 UNARY_ELEMENTWISE_SPEC_TO_ATEN = {
@@ -42,6 +47,7 @@ REDUCE_SPEC_TO_ATEN = {
     f"reduce_{ReduceSpec.ReductionType.PROD}": "aten::prod",
 }
 
+
 @dataclass
 class ConversionContext:
     op: OpType
@@ -52,13 +58,6 @@ class ConversionContext:
 
 class IRToTorchOpConverter(OpConverter[ConversionContext, Callable, OpType, List]):
     def _register_converters(self):
-        self._converters.update(
-            {
-                "permute": self._convert_permute,
-                "index": self._convert_index
-            }
-        )
-
         self._converters.update(
             {
                 key: self._convert_binary_elementwise
@@ -74,9 +73,15 @@ class IRToTorchOpConverter(OpConverter[ConversionContext, Callable, OpType, List
         )
 
         self._converters.update(
+            {key: self._convert_reduce for key in REDUCE_SPEC_TO_ATEN.keys()}
+        )
+
+        self._converters.update(
             {
-                key: self._convert_reduce
-                for key in REDUCE_SPEC_TO_ATEN.keys()
+                "permute": self._convert_permute,
+                "index": self._convert_index,
+                "group": self._convert_group,
+                "ungroup": self._convert_group,
             }
         )
 
@@ -91,54 +96,6 @@ class IRToTorchOpConverter(OpConverter[ConversionContext, Callable, OpType, List
 
     def _get_operation_key(self, op: OpType) -> str:
         return op.type
-
-    def _convert_permute(self, ctx: ConversionContext):
-        node = ctx.torch_graph.create("aten::permute")
-
-        input_val = ctx.name_to_output_value[ctx.op.inputs["input"]]
-
-        node.addInput(input_val)
-        node.addInput(ctx.torch_graph.insertConstant(ctx.op.spec.new_permutation))
-        node.output().setType(torch._C.TensorType.get())
-
-        return [node]
-    
-    def _convert_index(self, ctx: ConversionContext):
-        sorted_inds = sorted(ctx.op.spec.index.keys())
-
-        input_val = ctx.name_to_output_value[ctx.op.inputs["input"]]
-
-        num_removed = 0
-        nodes = []
-
-        for i in sorted_inds:
-            curr_val = ctx.op.spec.index[i]
-            if isinstance(curr_val, tuple):
-                node = ctx.torch_graph.create("aten::slice")
-
-                node.addInput(input_val)
-                node.addInput(ctx.torch_graph.insertConstant(i - num_removed))
-                node.addInput(ctx.torch_graph.insertConstant(curr_val[0]))
-                # from inclusive to exclusive end
-                if curr_val[1] == -1: # if to end of list replace with 2^63 - 1
-                    node.addInput(ctx.torch_graph.insertConstant(9223372036854775807))
-                else:
-                    node.addInput(ctx.torch_graph.insertConstant(curr_val[1] + 1))
-                node.addInput(ctx.torch_graph.insertConstant(curr_val[2]))
-            else:
-                node = ctx.torch_graph.create("aten::select")
-
-                node.addInput(input_val)
-                node.addInput(ctx.torch_graph.insertConstant(i - num_removed))
-                node.addInput(ctx.torch_graph.insertConstant(curr_val))
-
-                num_removed += 1
-
-            node.output().setType(torch._C.TensorType.get())
-
-            nodes.append(node)
-
-        return nodes
 
     def _convert_binary_elementwise(
         self, ctx: ConversionContext
@@ -212,17 +169,19 @@ class IRToTorchOpConverter(OpConverter[ConversionContext, Callable, OpType, List
             out = [node]
 
         return out
-    
-    def _convert_reduce(self, ctx: ConversionContext):
+
+    def _convert_reduce(self, ctx: ConversionContext) -> List[torch._C.Node]:
         input_val = ctx.name_to_output_value[ctx.op.inputs["input"]]
         reduction_dims = ctx.op.spec.reduce_dimensions
         squeeze_dims = ctx.op.spec.squeeze_dimensions
         if len(squeeze_dims) > 0 and reduction_dims != squeeze_dims:
-                raise Exception("Pytorch cannot keep only some reduced dims only all or nothing.")
-        
+            raise Exception(
+                "Pytorch cannot keep only some reduced dims only all or nothing."
+            )
+
         const_true = ctx.torch_graph.insertConstant(True)
         const_none = ctx.torch_graph.insertConstant(None)
-        
+
         if ctx.op.type == "reduce_prod":
             out_nodes = []
             for r in reduction_dims:
@@ -240,13 +199,70 @@ class IRToTorchOpConverter(OpConverter[ConversionContext, Callable, OpType, List
                 out_nodes.append(node)
             return out_nodes
         else:
-            keep_dims = ctx.torch_graph.insertConstant(True if len(squeeze_dims) == 0 else False)
+            keep_dims = ctx.torch_graph.insertConstant(
+                True if len(squeeze_dims) == 0 else False
+            )
             node = ctx.torch_graph.create(REDUCE_SPEC_TO_ATEN[ctx.op.type])
 
             node.addInput(input_val)
             node.addInput(ctx.torch_graph.insertConstant(reduction_dims))
             node.addInput(keep_dims)
             if ctx.op.type in ["reduce_sum", "reduce_mean"]:
-                node.addInput(const_none) #for some reason sum has an output dtype
+                node.addInput(const_none)  # for some reason sum has an output dtype
 
             return [node]
+
+    def _convert_permute(self, ctx: ConversionContext) -> List[torch._C.Node]:
+        node = ctx.torch_graph.create("aten::permute")
+
+        input_val = ctx.name_to_output_value[ctx.op.inputs["input"]]
+
+        node.addInput(input_val)
+        node.addInput(ctx.torch_graph.insertConstant(ctx.op.spec.new_permutation))
+        node.output().setType(torch._C.TensorType.get())
+
+        return [node]
+
+    def _convert_index(self, ctx: ConversionContext) -> List[torch._C.Node]:
+        sorted_inds = sorted(ctx.op.spec.index.keys())
+
+        input_val = ctx.name_to_output_value[ctx.op.inputs["input"]]
+
+        num_removed = 0
+        nodes = []
+
+        for i in sorted_inds:
+            curr_val = ctx.op.spec.index[i]
+            if isinstance(curr_val, tuple):
+                node = ctx.torch_graph.create("aten::slice")
+
+                node.addInput(input_val)
+                node.addInput(ctx.torch_graph.insertConstant(i - num_removed))
+                node.addInput(ctx.torch_graph.insertConstant(curr_val[0]))
+                # from inclusive to exclusive end
+                if curr_val[1] == -1:  # if to end of list replace with 2^63 - 1
+                    node.addInput(ctx.torch_graph.insertConstant(9223372036854775807))
+                else:
+                    node.addInput(ctx.torch_graph.insertConstant(curr_val[1] + 1))
+                node.addInput(ctx.torch_graph.insertConstant(curr_val[2]))
+            else:
+                node = ctx.torch_graph.create("aten::select")
+
+                node.addInput(input_val)
+                node.addInput(ctx.torch_graph.insertConstant(i - num_removed))
+                node.addInput(ctx.torch_graph.insertConstant(curr_val))
+
+                num_removed += 1
+
+            node.output().setType(torch._C.TensorType.get())
+
+            nodes.append(node)
+
+        return nodes
+
+    def _convert_group(self, ctx: ConversionContext) -> List[torch._C.Node]:
+        input_val = ctx.name_to_output_value[ctx.op.inputs["input"]]
+        node = ctx.torch_graph.create("aten::reshape")
+        node.addInput(input_val)
+        node.addInput(ctx.torch_graph.insertConstant(ctx.op.spec._output_shape_sidecar))
+        return [node]

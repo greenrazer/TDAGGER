@@ -5,11 +5,18 @@ import torch.nn as nn
 
 from src.safe_dag import SafeDAG
 
+
 class ReshapeModule(nn.Module):
     def __init__(self):
         super().__init__()
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
+        x = x.reshape(4, 16, 2, 32, 4)
+        x = x.reshape(4, 32, 32, 4)
+        x = x.reshape(4, 32, 32, 2, 2)
+        x = x.reshape(4, 32, 32, 4)
+        x = x.reshape(2, 2, 32, 32, 4)
+        x = x.reshape(4, 32, 32, 4)
         x = x.reshape(4, -1, 8, 16)
         x = x.reshape(8, 16, -1)
         x = x.reshape(2, 4, 8, -1)
