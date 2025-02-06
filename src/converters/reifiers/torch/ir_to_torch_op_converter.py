@@ -9,6 +9,7 @@ from ....ir.safe_ir import (
     OpType,
     UnaryElementwiseSpec,
     ReduceSpec,
+    PadSpec,
 )
 from ...op_converter import OpConverter
 
@@ -82,6 +83,7 @@ class IRToTorchOpConverter(OpConverter[ConversionContext, Callable, OpType, List
                 "index": self._convert_index,
                 "group": self._convert_group,
                 "ungroup": self._convert_group,
+                "pad": self._convert_pad,
             }
         )
 
@@ -265,4 +267,33 @@ class IRToTorchOpConverter(OpConverter[ConversionContext, Callable, OpType, List
         node = ctx.torch_graph.create("aten::reshape")
         node.addInput(input_val)
         node.addInput(ctx.torch_graph.insertConstant(ctx.op.spec._output_shape_sidecar))
+        return [node]
+
+    def _convert_pad(self, ctx: ConversionContext) -> List[torch._C.Node]:
+        input_val = ctx.name_to_output_value[ctx.op.inputs["input"]]
+        node = ctx.torch_graph.create("aten::pad")
+        node.addInput(input_val)
+
+        # padding is stored in reverse last dim -> first dim
+        pad_arr = []
+        for i in range(
+            ctx.op.spec._ouptut_dims_sidecar - 1, min(ctx.op.spec.pad.keys()) - 1, -1
+        ):
+            if i in ctx.op.spec.pad:
+                pad_arr.extend(list(ctx.op.spec.pad[i]))
+            else:
+                pad_arr.extend([0, 0])
+
+        if isinstance(ctx.op.spec.pad_mode, PadSpec.PadMode):
+            # non-constant padding only works with 2-5D tensors
+            if len(pad_arr) < 4:
+                pad_arr += [0, 0]
+            node.addInput(ctx.torch_graph.insertConstant(pad_arr))
+            node.addInput(ctx.torch_graph.insertConstant(ctx.op.spec.pad_mode.to_str()))
+            node.addInput(ctx.torch_graph.insertConstant(None))
+        else:
+            node.addInput(ctx.torch_graph.insertConstant(pad_arr))
+            node.addInput(ctx.torch_graph.insertConstant("constant"))
+            node.addInput(ctx.torch_graph.insertConstant(float(ctx.op.spec.pad_mode)))
+
         return [node]

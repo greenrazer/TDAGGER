@@ -22,6 +22,8 @@ from ....ir.safe_ir import (
     GroupSpec,
     GroupType,
     UngroupSpec,
+    PadSpec,
+    PadType,
 )
 from ..canon_op_converter import CanonOpConverter
 
@@ -101,6 +103,7 @@ class TorchToIROpConverter(
                 "aten::slice": self._convert_index,
                 "aten::select": self._convert_index,
                 "aten::reshape": self._convert_reshape,
+                "aten::pad": self._convert_pad,
             }
         )
 
@@ -351,3 +354,42 @@ class TorchToIROpConverter(
         )
 
         return out, {}
+
+    def _convert_pad(
+        self, ctx: ConversionContext
+    ) -> Tuple[List[OpType], Dict[str, Union[ScalarType, TensorType]]]:
+        out_name = ctx.torch_op.output().debugName().replace(".", "_")
+        input_names = self._inputs_to_names(ctx)
+        input_constant_values = self._inputs_constants_to_values(ctx)
+
+        input_shape = ctx.torch_op.inputsAt(0).type().sizes()
+        input_pad = input_constant_values[1]
+        pad_constant = (
+            0 if input_constant_values[3] is None else input_constant_values[3]
+        )
+        pad_mode = (
+            pad_constant
+            if input_constant_values[2] == "constant"
+            else PadSpec.PadMode.from_str(input_constant_values[2])
+        )
+
+        # padding is stored in reverse last dim -> first dim
+        pad_dict = {}
+        for pad_idx, dim_idx in zip(
+            range(len(input_pad) - 1, -1, -2),
+            range(len(input_shape) - len(input_pad) // 2, len(input_shape)),
+        ):
+            pad_tup = (input_pad[pad_idx - 1], input_pad[pad_idx])
+            if pad_tup != (0, 0):
+                pad_dict[dim_idx] = pad_tup
+
+        pad_op = PadType(
+            name=out_name,
+            inputs={"input": input_names[0]},
+            spec=PadSpec(
+                pad=pad_dict, pad_mode=pad_mode, _ouptut_dims_sidecar=len(input_shape)
+            ),
+            debug_sources=ctx.debug_sources,
+        )
+
+        return [pad_op], {}

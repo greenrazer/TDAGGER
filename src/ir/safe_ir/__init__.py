@@ -22,4 +22,6 @@ from .ops import (
     GroupSpec,
     UngroupSpec,
     GroupType,
+    PadSpec,
+    PadType
 )
