@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 from enum import Enum, auto
-from typing import Dict, List, Tuple, Union, Set
+from typing import Dict, List, Set, Tuple, Union
 
 from .op_type import OpType
 

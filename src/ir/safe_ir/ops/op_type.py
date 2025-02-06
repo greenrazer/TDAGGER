@@ -48,7 +48,7 @@ class OpType(ABC):
     @abstractmethod
     def type(self) -> str:
         pass
-    
+
     @property
     @abstractmethod
     def required_input_keys(self) -> List[str]:

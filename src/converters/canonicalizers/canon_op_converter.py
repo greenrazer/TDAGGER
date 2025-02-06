@@ -11,7 +11,6 @@ from ...ir.safe_ir import (
     UnaryElementwiseSpec,
     UnaryElementwiseType,
 )
-
 from ..op_converter import OpConverter
 
 ContextT = TypeVar("ContextT")

@@ -184,7 +184,7 @@ class TorchCanonicalizer(Canonicalizer):
                     case "ListType":
                         # ignore list types for now
                         pass
-                        #go though each of the elements
+                        # go though each of the elements
                         # match node.output().type().getElementType().kind():
                         #     case "IntType":
                         #         element_type = DataType.INT32
@@ -196,7 +196,7 @@ class TorchCanonicalizer(Canonicalizer):
                         #         raise Exception(
                         #             f"List Type Element Type Unknown: {node.output().type().getElementType()}."
                         #        )
-                        
+
                         # for ind, list_output in enumerate(node.output().toIValue()):
                         #     constants[f"name_{ind}"] = ScalarType(
                         #         spec=ScalarSpec(type=element_type),

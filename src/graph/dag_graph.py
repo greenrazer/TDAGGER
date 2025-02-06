@@ -2,9 +2,9 @@ from enum import Enum, auto
 from typing import Dict, List
 
 from ..ir.safe_ir import (
-    SpecType,
     DataHolderType,
     OpType,
+    SpecType,
 )
 
 

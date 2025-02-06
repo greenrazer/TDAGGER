@@ -14,6 +14,7 @@ class DataType(Enum):
     NONE = auto()
     STRING = auto()
 
+
 @dataclass
 class ScalarSpec:
     type: DataType
@@ -23,6 +24,7 @@ class ScalarSpec:
 class ScalarType:
     spec: ScalarSpec
     data: Any
+
 
 @dataclass
 class TensorSpec:
@@ -34,6 +36,7 @@ class TensorSpec:
 class TensorType:
     spec: TensorSpec
     data: np.array
+
 
 SpecType = Union[ScalarSpec, TensorSpec]
 DataHolderType = Union[ScalarSpec, TensorSpec]

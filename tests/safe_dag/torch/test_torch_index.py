@@ -5,13 +5,14 @@ import torch.nn as nn
 
 from src.safe_dag import SafeDAG
 
+
 class IndexSlice(nn.Module):
     def __init__(self):
         super().__init__()
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         x = x[:, 2:-2, 1, ::2, :, :, 0]
-        x = x[0,:, 1, ...]
+        x = x[0, :, 1, ...]
         x = x[:, 1:15:2, 2:20:3]
         x = x[..., 1:2, :2]
         x = x[1:2, 0]

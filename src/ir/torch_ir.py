@@ -1,5 +1,7 @@
 import torch
+
 from .safe_ir import DataType
+
 
 @staticmethod
 def datatype_from_torch(torch_dtype: torch.dtype) -> "DataType":

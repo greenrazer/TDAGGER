@@ -1,6 +1,6 @@
 from typing import Dict, List
 
-from ..ir.safe_ir import SpecType, DataHolderType, OpType
+from ..ir.safe_ir import DataHolderType, OpType, SpecType
 from .dag_graph import DAGGraph
 
 

@@ -7,9 +7,9 @@ from ....graph.dag_graph import DAGGraph
 from ....ir.safe_ir import (
     BinaryElementwiseSpec,
     OpType,
-    UnaryElementwiseSpec,
-    ReduceSpec,
     PadSpec,
+    ReduceSpec,
+    UnaryElementwiseSpec,
 )
 from ...op_converter import OpConverter
 
