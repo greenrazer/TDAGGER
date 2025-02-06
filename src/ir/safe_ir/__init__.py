@@ -23,5 +23,8 @@ from .ops import (
     UngroupSpec,
     GroupType,
     PadSpec,
-    PadType
+    PadType,
+    FoldSpec,
+    UnfoldSpec,
+    FoldType,
 )

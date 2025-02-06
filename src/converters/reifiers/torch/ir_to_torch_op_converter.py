@@ -84,6 +84,8 @@ class IRToTorchOpConverter(OpConverter[ConversionContext, Callable, OpType, List
                 "group": self._convert_group,
                 "ungroup": self._convert_group,
                 "pad": self._convert_pad,
+                "fold": self._convert_fold,
+                "unfold": self._convert_fold,
             }
         )
 
@@ -295,5 +297,39 @@ class IRToTorchOpConverter(OpConverter[ConversionContext, Callable, OpType, List
             node.addInput(ctx.torch_graph.insertConstant(pad_arr))
             node.addInput(ctx.torch_graph.insertConstant("constant"))
             node.addInput(ctx.torch_graph.insertConstant(float(ctx.op.spec.pad_mode)))
+
+        return [node]
+
+    def _convert_fold(self, ctx: ConversionContext) -> List[torch._C.Node]:
+        input_val = ctx.name_to_output_value[ctx.op.inputs["input"]]
+
+        # fold and unfold can only really work on 3D or 4D tensors in torch
+        match ctx.op.spec.type:
+            case "fold":
+                node = ctx.torch_graph.create("aten::col2im")
+                node.addInput(input_val)
+                node.addInput(
+                    ctx.torch_graph.insertConstant(
+                        ctx.op.spec._output_shape_sidecar[-2:]
+                    )
+                )
+                fold_dict = ctx.op.spec.fold
+            case "unfold":
+                node = ctx.torch_graph.create("aten::im2col")
+                node.addInput(input_val)
+                fold_dict = ctx.op.spec.unfold
+            case _:
+                raise Exception(f"Fold type Unknown: {ctx.op.spec.type}")
+
+        kernel_h, stride_h, dilation_h = fold_dict[2] if 2 in fold_dict else (0, 0, 0)
+        kernel_w, stride_w, dilation_w = fold_dict[3] if 3 in fold_dict else (0, 0, 0)
+        kernel = [kernel_h, kernel_w]
+        stride = [stride_h, stride_w]
+        dilation = [dilation_h, dilation_w]
+
+        node.addInput(ctx.torch_graph.insertConstant(kernel))
+        node.addInput(ctx.torch_graph.insertConstant(dilation))
+        node.addInput(ctx.torch_graph.insertConstant([0, 0]))
+        node.addInput(ctx.torch_graph.insertConstant(stride))
 
         return [node]

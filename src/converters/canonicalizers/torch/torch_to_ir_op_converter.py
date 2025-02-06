@@ -24,6 +24,9 @@ from ....ir.safe_ir import (
     UngroupSpec,
     PadSpec,
     PadType,
+    FoldSpec,
+    UnfoldSpec,
+    FoldType,
 )
 from ..canon_op_converter import CanonOpConverter
 
@@ -104,6 +107,8 @@ class TorchToIROpConverter(
                 "aten::select": self._convert_index,
                 "aten::reshape": self._convert_reshape,
                 "aten::pad": self._convert_pad,
+                "aten::im2col": self._convert_fold,
+                "aten::col2im": self._convert_fold,
             }
         )
 
@@ -393,3 +398,57 @@ class TorchToIROpConverter(
         )
 
         return [pad_op], {}
+
+    def _convert_fold(
+        self, ctx: ConversionContext
+    ) -> Tuple[List[OpType], Dict[str, Union[ScalarType, TensorType]]]:
+        out_name = ctx.torch_op.output().debugName().replace(".", "_")
+        input_names = self._inputs_to_names(ctx)
+        input_constant_values = self._inputs_constants_to_values(ctx)
+
+        # # currently kernel must be 2d and only affects the last 2 dimensions
+        if ctx.torch_op.kind() == "aten::im2col":
+            # padding = input_constant_values[3]
+            kernel_shape = input_constant_values[1]
+            dilation = input_constant_values[2]
+            stride = input_constant_values[4]
+            unfold_dict = {
+                (i + 2): (k, s, d)
+                for i, (k, s, d) in enumerate(zip(kernel_shape, stride, dilation))
+                if k != 0
+            }
+            spec = UnfoldSpec(unfold=unfold_dict)
+        elif ctx.torch_op.kind() == "aten::col2im":
+            input_shape = ctx.torch_op.inputsAt(0).type().sizes()
+            h, w = input_constant_values[1]
+            kernel_shape = input_constant_values[2]
+            kernel_size = kernel_shape[0] * kernel_shape[1]
+            dilation = input_constant_values[3]
+            # padding = input_constant_values[4]
+            stride = input_constant_values[5]
+
+            unfold_dict = {
+                (i + 2): (k, s, d)
+                for i, (k, s, d) in enumerate(zip(kernel_shape, stride, dilation))
+                if k != 0
+            }
+            spec = FoldSpec(
+                fold=unfold_dict,
+                _output_shape_sidecar=[
+                    input_shape[0],
+                    input_shape[1] // kernel_size,
+                    h,
+                    w,
+                ],
+            )
+        else:
+            raise Exception(f"Unknown torch fold op: {ctx.torch_op.kind()}.")
+
+        unfold_op = FoldType(
+            name=out_name,
+            inputs={"input": input_names[0]},
+            spec=spec,
+            debug_sources=ctx.debug_sources,
+        )
+
+        return [unfold_op], {}
