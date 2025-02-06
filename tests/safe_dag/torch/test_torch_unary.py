@@ -44,9 +44,6 @@ class TestTorchUnary(unittest.TestCase):
 
     def test_reconstructed_output(self):
         out_model = self.safe_dag.to_torchscript()
-        # print(self.safe_dag.graph)
-        # print(out_model._forward_function.graph)
-        # print(self.traced_model(self.example_input)[0, 0, 0, :10], out_model(self.example_input)[0, 0, 0, :10])
         self.assertTrue(
             torch.allclose(
                 self.traced_model(self.example_input), out_model(self.example_input)

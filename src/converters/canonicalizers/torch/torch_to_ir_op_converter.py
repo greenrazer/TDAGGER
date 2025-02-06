@@ -406,7 +406,7 @@ class TorchToIROpConverter(
         input_names = self._inputs_to_names(ctx)
         input_constant_values = self._inputs_constants_to_values(ctx)
 
-        # # currently kernel must be 2d and only affects the last 2 dimensions
+        # currently kernel must be 2d and only affects the last 2 dimensions
         if ctx.torch_op.kind() == "aten::im2col":
             # padding = input_constant_values[3]
             kernel_shape = input_constant_values[1]

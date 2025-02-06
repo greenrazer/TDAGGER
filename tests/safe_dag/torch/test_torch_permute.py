@@ -23,7 +23,6 @@ class SimplePermute(nn.Module):
 class TestTorchPermute(unittest.TestCase):
     def setUp(self):
         self.model = SimplePermute()
-        # Create example input: batch_size=2, height=32, width=32, channels=3
         self.example_input = torch.rand((2, 32, 32, 3))
 
         self.traced_model = torch.jit.trace(self.model, self.example_input)

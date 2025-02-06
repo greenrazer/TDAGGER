@@ -11,7 +11,6 @@ class PadModule(nn.Module):
         super().__init__()
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        # Test different padding configurations
         x = torch.nn.functional.pad(x, (1, 2))
         x = torch.nn.functional.pad(x, (1, 2, 3, 4))
         x = torch.nn.functional.pad(x, (4, 3, 2, 1, 2, 3))
@@ -23,10 +22,8 @@ class PadModule(nn.Module):
 class TestTorchPadding(unittest.TestCase):
     def setUp(self):
         self.model = PadModule()
-        # Create a test input with multiple dimensions
         self.example_input = torch.rand((2, 4, 6, 8, 10, 12, 14))
 
-        # Trace the model
         self.traced_model = torch.jit.trace(self.model, self.example_input)
         self.safe_dag = SafeDAG.from_torchscript(self.traced_model)
 
@@ -47,7 +44,6 @@ class PadNonConstant(nn.Module):
         super().__init__()
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        # Test different padding configurations
         x = torch.nn.functional.pad(x, (1, 1, 0, 0), mode="reflect")
         x = torch.nn.functional.pad(x, (0, 0, 2, 2), mode="reflect")
         x = torch.nn.functional.pad(x, (0, 0, 2, 2), mode="replicate")
@@ -61,10 +57,8 @@ class PadNonConstant(nn.Module):
 class TestTorchPaddingNonConstant(unittest.TestCase):
     def setUp(self):
         self.model = PadNonConstant()
-        # Create a test input with multiple dimensions
         self.example_input = torch.rand((2, 4, 6, 8))
 
-        # Trace the model
         self.traced_model = torch.jit.trace(self.model, self.example_input)
         self.safe_dag = SafeDAG.from_torchscript(self.traced_model)
 

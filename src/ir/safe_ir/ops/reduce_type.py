@@ -27,8 +27,8 @@ class ReduceSpec:
                 case ReduceSpec.ReductionType.PROD:
                     return "prod"
 
-    reduce_dimensions: List[int]  # Dimensions to reduce
-    squeeze_dimensions: List[int]  # Dimensions to squeeze
+    reduce_dimensions: List[int]
+    squeeze_dimensions: List[int]
     reduction_type: ReductionType
 
     def __post_init__(self):
