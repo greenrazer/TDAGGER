@@ -28,24 +28,14 @@ class ReduceSpec:
                     return "prod"
 
     reduce_dimensions: List[int]
-    squeeze_dimensions: List[int]
     reduction_type: ReductionType
 
     def __post_init__(self):
         if not self.reduce_dimensions:
             raise Exception("Must specify at least one reduction dimension")
 
-        for dim in self.squeeze_dimensions:
-            if dim not in self.reduce_dimensions:
-                raise Exception(
-                    f"Squeeze dimension {dim} must be in reduce dimensions {self.reduce_dimensions}"
-                )
-
         if len(set(self.reduce_dimensions)) != len(self.reduce_dimensions):
             raise Exception("Duplicate dimensions in reduce_dimensions")
-
-        if len(set(self.squeeze_dimensions)) != len(self.squeeze_dimensions):
-            raise Exception("Duplicate dimensions in squeeze_dimensions")
 
     def format_dimensions(self, dimensions, exclude_dims=None):
         # Filter out excluded dimensions
@@ -107,11 +97,8 @@ class ReduceSpec:
     def __str__(self):
         # Clean up consecutive ellipses
         input_str = self.format_dimensions(self.reduce_dimensions)
-        output_str = self.format_dimensions(
-            self.reduce_dimensions, exclude_dims=self.squeeze_dimensions
-        )
 
-        return f"{input_str} -> {output_str} | {self.reduction_type}"
+        return f"{input_str} | {self.reduction_type}"
 
 
 class ReduceType(OpType):

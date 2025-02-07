@@ -85,6 +85,8 @@ class IRToTorchOpConverter(OpConverter[ConversionContext, Callable, OpType, List
                 "pad": self._convert_pad,
                 "fold": self._convert_fold,
                 "unfold": self._convert_fold,
+                "squeeze": self._convert_squeeze,
+                "unsqueeze": self._convert_squeeze,
             }
         )
 
@@ -180,11 +182,6 @@ class IRToTorchOpConverter(OpConverter[ConversionContext, Callable, OpType, List
     ) -> List[torch._C.Node]:
         input_val = context.name_to_output_value[op.inputs["input"]]
         reduction_dims = op.spec.reduce_dimensions
-        squeeze_dims = op.spec.squeeze_dimensions
-        if len(squeeze_dims) > 0 and reduction_dims != squeeze_dims:
-            raise Exception(
-                "Pytorch cannot keep only some reduced dims only all or nothing."
-            )
 
         const_true = context.torch_graph.insertConstant(True)
         const_none = context.torch_graph.insertConstant(None)
@@ -199,21 +196,13 @@ class IRToTorchOpConverter(OpConverter[ConversionContext, Callable, OpType, List
                 node.addInput(const_none)
                 input_val = node.output()
                 out_nodes.append(node)
-
-            if len(squeeze_dims) > 0:
-                node = context.torch_graph.create("aten::squeeze")
-                node.addInput(input_val)
-                out_nodes.append(node)
             return out_nodes
         else:
-            keep_dims = context.torch_graph.insertConstant(
-                True if len(squeeze_dims) == 0 else False
-            )
             node = context.torch_graph.create(REDUCE_SPEC_TO_ATEN[op.type])
 
             node.addInput(input_val)
             node.addInput(context.torch_graph.insertConstant(reduction_dims))
-            node.addInput(keep_dims)
+            node.addInput(context.torch_graph.insertConstant(True))
             if op.type in ["reduce_sum", "reduce_mean"]:
                 node.addInput(const_none)  # for some reason sum has an output dtype
 
@@ -253,7 +242,9 @@ class IRToTorchOpConverter(OpConverter[ConversionContext, Callable, OpType, List
                 node.addInput(context.torch_graph.insertConstant(curr_val[0]))
                 # from inclusive to exclusive end
                 if curr_val[1] == -1:  # if to end of list replace with 2^63 - 1
-                    node.addInput(context.torch_graph.insertConstant(9223372036854775807))
+                    node.addInput(
+                        context.torch_graph.insertConstant(9223372036854775807)
+                    )
                 else:
                     node.addInput(context.torch_graph.insertConstant(curr_val[1] + 1))
                 node.addInput(context.torch_graph.insertConstant(curr_val[2]))
@@ -354,3 +345,33 @@ class IRToTorchOpConverter(OpConverter[ConversionContext, Callable, OpType, List
         node.addInput(context.torch_graph.insertConstant(stride))
 
         return [node]
+
+    def _convert_squeeze(
+        self, context: ConversionContext, op: OpType
+    ) -> List[torch._C.Node]:
+        input_val = context.name_to_output_value[op.inputs["input"]]
+
+        output = []
+        match op.spec.type:
+            case "squeeze":
+                node = context.torch_graph.create("aten::squeeze")
+                node.addInput(input_val)
+                node.addInput(context.torch_graph.insertConstant(op.spec.dimensions))
+                output.append(node)
+            case "unsqueeze":
+                last_node = input_val
+                for d in sorted([i for i in op.spec.dimensions if i >= 0]):
+                    node = context.torch_graph.create("aten::unsqueeze")
+                    node.addInput(last_node)
+                    node.addInput(context.torch_graph.insertConstant(d))
+                    output.append(node)
+                    last_node = node.output()
+                for d in sorted([i for i in op.spec.dimensions if i < 0]):
+                    node = context.torch_graph.create("aten::unsqueeze")
+                    node.addInput(last_node)
+                    node.addInput(context.torch_graph.insertConstant(d))
+                    output.append(node)
+                    last_node = node.output()
+            case _:
+                raise Exception(f"Squeeze type Unknown: {op.spec.type}")
+        return output

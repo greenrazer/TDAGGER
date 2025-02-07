@@ -27,4 +27,7 @@ from .ops import (
     FoldSpec,
     UnfoldSpec,
     FoldType,
+    SqueezeSpec,
+    UnsqueezeSpec,
+    SqueezeType
 )

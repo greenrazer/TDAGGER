@@ -21,12 +21,15 @@ from ....ir.safe_ir import (
     ReduceSpec,
     ReduceType,
     ScalarType,
+    SqueezeSpec,
+    SqueezeType,
     TensorSpec,
     TensorType,
     UnaryElementwiseSpec,
     UnaryElementwiseType,
     UnfoldSpec,
     UngroupSpec,
+    UnsqueezeSpec,
 )
 from ..canon_op_converter import CanonOpConverter
 
@@ -108,6 +111,8 @@ class TorchToIROpConverter(
                 "aten::pad": self._convert_pad,
                 "aten::im2col": self._convert_fold,
                 "aten::col2im": self._convert_fold,
+                "aten::squeeze": self._convert_squeeze,
+                "aten::unsqueeze": self._convert_squeeze,
             }
         )
 
@@ -129,7 +134,9 @@ class TorchToIROpConverter(
     def _get_operation_key(self, torch_op: "torch._C.Node") -> str:
         return torch_op.kind()
 
-    def _inputs_to_names(self, context: ConversionContext, torch_op: torch._C.Node) -> List[str]:
+    def _inputs_to_names(
+        self, context: ConversionContext, torch_op: torch._C.Node
+    ) -> List[str]:
         input_names = []
         for input_value in torch_op.inputs():
             if input_value in context.output_value_to_name:
@@ -140,13 +147,19 @@ class TorchToIROpConverter(
             input_names.append(in_name)
         return input_names
 
-    def _inputs_to_nodes(self, context: ConversionContext, torch_op: torch._C.Node) -> List[torch._C.Node]:
+    def _inputs_to_nodes(
+        self, context: ConversionContext, torch_op: torch._C.Node
+    ) -> List[torch._C.Node]:
         return [context.output_value_to_node[i] for i in torch_op.inputs()]
 
-    def _inputs_to_torch_types(self, context: ConversionContext, torch_op: torch._C.Node) -> List[str]:
+    def _inputs_to_torch_types(
+        self, context: ConversionContext, torch_op: torch._C.Node
+    ) -> List[str]:
         return [i.type().kind() for i in torch_op.inputs()]
 
-    def _inputs_constants_to_values(self, context: ConversionContext, torch_op: torch._C.Node) -> List[Any]:
+    def _inputs_constants_to_values(
+        self, context: ConversionContext, torch_op: torch._C.Node
+    ) -> List[Any]:
         input_scalar_values = []
         for input_value in torch_op.inputs():
             node = context.output_value_to_node[input_value]
@@ -220,22 +233,34 @@ class TorchToIROpConverter(
             if input_types[1] == "ListType"
             else [input_constant_values[1]]
         )
-        squeeze_dimensions = [] if input_constant_values[2] else reduce_dimensions
 
         reduction_spec = ReduceSpec(
             reduce_dimensions=reduce_dimensions,
-            squeeze_dimensions=squeeze_dimensions,
             reduction_type=ATEN_TO_REDUCE_SPEC_TYPE[torch_op.kind()],
         )
 
         reduction_op = ReduceType(
-            out_name,
-            {"input": input_names[0]},
-            reduction_spec,
+            name=out_name if input_constant_values[2] else f"{out_name}_reduction",
+            inputs={"input": input_names[0]},
+            spec=reduction_spec,
             debug_sources=context.debug_sources,
         )
 
-        return [reduction_op], {}
+        output = [reduction_op]
+
+        if not input_constant_values[2]:
+            squeeze_spec = SqueezeSpec(dimensions=reduce_dimensions)
+
+            squeeze_op = GroupType(
+                name=out_name,
+                inputs={"input": reduction_op.name},
+                spec=squeeze_spec,
+                debug_sources=context.debug_sources,
+            )
+
+            output.append(squeeze_op)
+
+        return output, {}
 
     def _convert_relu(
         self, context: ConversionContext, torch_op: torch._C.Node
@@ -515,3 +540,35 @@ class TorchToIROpConverter(
             raise Exception(f"Unknown torch fold op: {torch_op.kind()}.")
 
         return output, {}
+
+    def _convert_squeeze(
+        self, context: ConversionContext, torch_op: torch._C.Node
+    ) -> Tuple[List[OpType], Dict[str, Union[ScalarType, TensorType]]]:
+        out_name = torch_op.output().debugName().replace(".", "_")
+
+        input_names = self._inputs_to_names(context, torch_op)
+        input_constant_values = self._inputs_constants_to_values(context, torch_op)
+        input_types = self._inputs_to_torch_types(context, torch_op)
+        input_shape = torch_op.inputsAt(0).type().sizes()
+        match torch_op.kind():
+            case "aten::squeeze":
+                if len(input_constant_values) == 2:
+                    dims = (
+                        input_constant_values[1]
+                        if input_types[1] == "ListType"
+                        else [input_constant_values[1]]
+                    )
+                else:
+                    dims = [i for i, d in enumerate(input_shape) if d == 1]
+                squeeze_spec = SqueezeSpec(dimensions=dims)
+            case "aten::unsqueeze":
+                squeeze_spec = UnsqueezeSpec(dimensions=[input_constant_values[1]])
+
+        sq_op = SqueezeType(
+            name=out_name,
+            inputs={"input": input_names[0]},
+            spec=squeeze_spec,
+            debug_sources=context.debug_sources,
+        )
+
+        return [sq_op], {}
