@@ -15,7 +15,9 @@ class UnfoldFoldModule(nn.Module):
         x = F.unfold(x, kernel_size=(2, 2), stride=3, dilation=2, padding=1)
         # L[d] = (x.shape[d] + 2 * padding[d] - dilation[d] * (kernel_size[d] - 1) - 1) / stride[d] + 1
         # batch, channels * kernel_elements, prod over all d dimensions L[d]
-        x = F.fold(x, output_size=(32, 32), kernel_size=(2, 2), stride=3, dilation=2, padding=1)
+        x = F.fold(
+            x, output_size=(32, 32), kernel_size=(2, 2), stride=3, dilation=2, padding=1
+        )
         # L_inv[d] = (L[d] - 1) * stride[d] - 2 * padding[d] + dilation[d] * (kernel_size[d] - 1) + 1
         # batch, channels, L_inv[0], L_inv[1]
         return x

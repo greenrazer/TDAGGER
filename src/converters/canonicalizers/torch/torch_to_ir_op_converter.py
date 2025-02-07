@@ -427,36 +427,36 @@ class TorchToIROpConverter(
                     name=f"{out_name}_pad",
                     inputs={"input": input_names[0]},
                     spec=PadSpec(
-                        pad=pad_dict, 
-                        pad_mode=0, 
-                        _ouptut_dims_sidecar=len(input_shape)
+                        pad=pad_dict, pad_mode=0, _ouptut_dims_sidecar=len(input_shape)
                     ),
                     debug_sources=ctx.debug_sources,
                 )
                 output.append(pad_op)
 
             unfold_dict = {
-                (i  + len(input_shape) - 2): (k, s, d)
+                (i + len(input_shape) - 2): (k, s, d)
                 for i, (k, s, d) in enumerate(zip(kernel_shape, stride, dilation))
                 if k != 0
             }
+
             def out_size(d):
-                return (input_shape[d] + 2 * padding[d] - dilation[d] * (kernel_shape[d] - 1) - 1) / stride[d] + 1
+                return (
+                    input_shape[d]
+                    + 2 * padding[d]
+                    - dilation[d] * (kernel_shape[d] - 1)
+                    - 1
+                ) / stride[d] + 1
+
             out_shape = []
             if len(input_shape) == 4:
                 out_shape.append(input_shape[-4])
-            out_shape.extend([
-                input_shape[-3],
-                out_size(-2),
-                out_size(-1)
-            ])
-            spec = UnfoldSpec(
-                unfold=unfold_dict,
-                _output_shape_sidecar=out_shape
-            )
+            out_shape.extend([input_shape[-3], out_size(-2), out_size(-1)])
+            spec = UnfoldSpec(unfold=unfold_dict, _output_shape_sidecar=out_shape)
             unfold_op = FoldType(
-                name= out_name,
-                inputs={"input": input_names[0] if len(output) == 0 else output[-1].name},
+                name=out_name,
+                inputs={
+                    "input": input_names[0] if len(output) == 0 else output[-1].name
+                },
                 spec=spec,
                 debug_sources=ctx.debug_sources,
             )
@@ -482,11 +482,9 @@ class TorchToIROpConverter(
             out_shape = []
             if len(input_shape) == 3:
                 out_shape.append(input_shape[-3])
-            out_shape.extend([
-                input_shape[-2]//kernel_size,
-                h + padding[-2],
-                w + padding[-1]
-            ])
+            out_shape.extend(
+                [input_shape[-2] // kernel_size, h + padding[-2], w + padding[-1]]
+            )
             # the outside equation should be (input_shape[d] - 1) * stride[d] - 2 * padding[d] + dilation[d] * (kernel_size[d] - 1) + 1
             spec = FoldSpec(
                 fold=unfold_dict,
@@ -503,21 +501,19 @@ class TorchToIROpConverter(
 
             if has_padding:
                 index_dict = {
-                    (i  + len(input_shape) - 1): (p, -p, 1)
+                    (i + len(input_shape) - 1): (p, -p, 1)
                     for i, p in enumerate(padding)
                     if p > 0
                 }
                 index_op = IndexType(
                     name=out_name,
                     inputs={"input": fold_op.name},
-                    spec=IndexSpec(
-                        index=index_dict
-                    ),
+                    spec=IndexSpec(index=index_dict),
                     debug_sources=ctx.debug_sources,
                 )
                 output.append(index_op)
-            
+
         else:
             raise Exception(f"Unknown torch fold op: {ctx.torch_op.kind()}.")
-        
+
         return output, {}
