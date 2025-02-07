@@ -7,10 +7,34 @@ from .op_type import OpType
 
 @dataclass
 class FoldSpec:
-    fold: Dict[int, Tuple[int, int, int]]
+    fold: Dict[int, Tuple[int, int, int]]  # dim -> (kernel_size, stride, dialation)
 
     # TODO: remove and propagate shape through network
     _output_shape_sidecar: List[int]
+
+    def __str__(self):
+        out = []
+        last_dim = -1
+        for d in sorted([d for d in self.fold.keys() if d >= 0]):
+            if d != last_dim + 1:
+                out.append("...")
+            k, s, di = self.fold[d]
+            out.append(f"{{{d}: kernel={k} stride={s} dialation={di}}}")
+            last_dim = d
+        out.append("...")
+        neg_dims = sorted([d for d in self.fold.keys() if d < 0])
+        if len(neg_dims) > 0:
+            last_dim = neg_dims[0] - 1
+            for d in neg_dims:
+                if d != last_dim + 1:
+                    out.append("...")
+                k, s, di = self.fold[d]
+                out.append(f"{{{d}: kernel={k} stride={s} dialation={di}}}")
+                last_dim = d
+            if last_dim != -1:
+                out.append("...")
+
+        return " ".join(out)
 
     @property
     def type(self) -> str:
@@ -19,10 +43,34 @@ class FoldSpec:
 
 @dataclass
 class UnfoldSpec:
-    unfold: Dict[int, Tuple[int, int, int]]
+    unfold: Dict[int, Tuple[int, int, int]]  # dim -> (kernel_size, stride, dialation)
 
     # TODO: remove and propagate shape through network
     _output_shape_sidecar: List[int]
+
+    def __str__(self):
+        out = []
+        last_dim = -1
+        for d in sorted([d for d in self.unfold.keys() if d >= 0]):
+            if d != last_dim + 1:
+                out.append("...")
+            k, s, di = self.unfold[d]
+            out.append(f"{{{d}: kernel={k} stride={s} dialation={di}}}")
+            last_dim = d
+        out.append("...")
+        neg_dims = sorted([d for d in self.unfold.keys() if d < 0])
+        if len(neg_dims) > 0:
+            last_dim = neg_dims[0] - 1
+            for d in neg_dims:
+                if d != last_dim + 1:
+                    out.append("...")
+                k, s, di = self.unfold[d]
+                out.append(f"{{{d}: kernel={k} stride={s} dialation={di}}}")
+                last_dim = d
+            if -1 not in self.unfold:
+                out.append("...")
+
+        return " ".join(out)
 
     @property
     def type(self) -> str:
@@ -40,7 +88,7 @@ class FoldType(OpType):
 
     def __str__(self) -> str:
         inp_name = self.inputs["input"]
-        out = f"%{self.name}: %{inp_name}[{self.spec}]{self.debug_sources_to_str()}"
+        out = f"%{self.name}: {self.type}[{self.spec}](%{inp_name}){self.debug_sources_to_str()}"
         return out
 
     @property

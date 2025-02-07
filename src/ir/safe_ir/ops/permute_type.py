@@ -9,8 +9,7 @@ class PermuteSpec:
     new_permutation: List[int]
 
     def __str__(self):
-        original = list(range(len(self.new_permutation)))
-        return f"{' '.join(map(str, original))} -> {' '.join(map(str, self.new_permutation))}"
+        return f"{' '.join(map(str, self.new_permutation))}"
 
 
 class PermuteType(OpType):

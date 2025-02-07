@@ -1,3 +1,4 @@
+import math
 from dataclasses import dataclass
 from typing import Any, Callable, Dict, List, Tuple, Union
 
@@ -251,7 +252,7 @@ class TorchToIROpConverter(
         if not input_constant_values[2]:
             squeeze_spec = SqueezeSpec(dimensions=reduce_dimensions)
 
-            squeeze_op = GroupType(
+            squeeze_op = SqueezeType(
                 name=out_name,
                 inputs={"input": reduction_op.name},
                 spec=squeeze_spec,
@@ -463,12 +464,16 @@ class TorchToIROpConverter(
             }
 
             def out_size(d):
-                return (
-                    input_shape[d]
-                    + 2 * padding[d]
-                    - dilation[d] * (kernel_shape[d] - 1)
-                    - 1
-                ) / stride[d] + 1
+                return math.floor(
+                    (
+                        input_shape[d]
+                        + 2 * padding[d]
+                        - dilation[d] * (kernel_shape[d] - 1)
+                        - 1
+                    )
+                    / stride[d]
+                    + 1
+                )
 
             out_shape = []
             if len(input_shape) == 4:
@@ -506,7 +511,11 @@ class TorchToIROpConverter(
             if len(input_shape) == 3:
                 out_shape.append(input_shape[-3])
             out_shape.extend(
-                [input_shape[-2] // kernel_size, h + padding[-2], w + padding[-1]]
+                [
+                    input_shape[-2] // kernel_size,
+                    h + 2 * padding[-2],
+                    w + 2 * padding[-1],
+                ]
             )
             # the outside equation should be (input_shape[d] - 1) * stride[d] - 2 * padding[d] + dilation[d] * (kernel_size[d] - 1) + 1
             spec = FoldSpec(
@@ -524,7 +533,7 @@ class TorchToIROpConverter(
 
             if has_padding:
                 index_dict = {
-                    (i + len(input_shape) - 1): (p, -p, 1)
+                    (i + len(input_shape) - 1): (p, -p - 1, 1)
                     for i, p in enumerate(padding)
                     if p > 0
                 }

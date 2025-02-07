@@ -32,11 +32,52 @@ class PadSpec:
                 case PadSpec.PadMode.CLOSEST_EDGE:
                     return "replicate"
 
-    pad: Dict[int, Tuple[int, int]]
+        def __str__(self):
+            return self.to_str()
+
+    pad: Dict[int, Tuple[int, int]]  # dim -> (pad_before, pad_after)
     pad_mode: Union[Any, PadMode]
 
     # TODO: remove and propagate dims through network
     _ouptut_dims_sidecar: int
+
+    def __str__(self):
+        out = []
+        last_dim = -1
+        for d in sorted([d for d in self.pad.keys() if d >= 0]):
+            if d != last_dim + 1:
+                out.append("...")
+            match self.pad[d]:
+                case (0, 0):
+                    continue
+                case (0, r):
+                    out.append(f"{d} -> {r}")
+                case (l, 0):
+                    out.append(f"{l} <- {d}")
+                case (l, r):
+                    out.append(f"{l} <- {d} -> {r}")
+            last_dim = d
+        out.append("...")
+        neg_dims = sorted([d for d in self.pad.keys() if d < 0])
+        if len(neg_dims) > 0:
+            last_dim = neg_dims[0] - 1
+            for d in neg_dims:
+                if d != last_dim + 1:
+                    out.append("...")
+                match self.pad[d]:
+                    case (0, 0):
+                        continue
+                    case (0, r):
+                        out.append(f"{d} -> {r}")
+                    case (l, 0):
+                        out.append(f"{l} <- {d}")
+                    case (l, r):
+                        out.append(f"{l} <- {d} -> {r}")
+                last_dim = d
+            if last_dim != -1:
+                out.append("...")
+
+        return f"{' '.join(out)} | pad_mode={self.pad_mode}"
 
 
 class PadType(OpType):
@@ -48,7 +89,9 @@ class PadType(OpType):
 
     def __str__(self) -> str:
         inp_name = self.inputs["input"]
-        out = f"%{self.name}: %{inp_name}[{self.spec}]{self.debug_sources_to_str()}"
+        out = (
+            f"%{self.name}: pad[{self.spec}](%{inp_name}){self.debug_sources_to_str()}"
+        )
         return out
 
     @property

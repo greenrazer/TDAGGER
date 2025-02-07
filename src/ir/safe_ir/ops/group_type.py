@@ -64,6 +64,52 @@ class GroupSpec:
     # TODO: remove and propagate shape through network
     _output_shape_sidecar: List[int]
 
+    def __post_init__(self):
+        flattened = []
+
+        for sublist in self.groups:
+            if not sublist:
+                continue
+            flattened.extend(sublist)
+            is_positive = all(x >= 0 for x in sublist)
+            is_negative = all(x < 0 for x in sublist)
+            if not (is_positive or is_negative):
+                raise Exception(
+                    f"Group dimensions must be entirely positive or entirely negitive: {sublist}."
+                )
+
+        if len(flattened) != len(set(flattened)):
+            raise Exception("Group dimensions must be unique.")
+
+    def __str__(self):
+        sorted_groups = [sorted(sublist) for sublist in self.groups]
+        positive_groups = sorted(
+            [lst for lst in sorted_groups if lst and lst[0] >= 0], key=lambda x: x[0]
+        )
+        negative_groups = sorted(
+            [lst for lst in sorted_groups if lst and lst[0] < 0], key=lambda x: x[0]
+        )
+
+        out = []
+        last_dim = -1
+        for group in positive_groups:
+            if group[0] != last_dim + 1:
+                out.append("...")
+            out.append(f"({' '.join(group)})")
+            last_dim = group[-1]
+        out.append("...")
+        if len(negative_groups) > 0:
+            last_dim = negative_groups[0][0] - 1
+            for group in negative_groups:
+                if group[0] != last_dim + 1:
+                    out.append("...")
+                out.append(f"({' '.join(group)})")
+                last_dim = group[-1]
+            if last_dim != -1:
+                out.append("...")
+
+        return " ".join(out)
+
     @property
     def type(self):
         return "group"
@@ -80,6 +126,32 @@ class UngroupSpec:
     def type(self):
         return "ungroup"
 
+    def __str__(self):
+        out = []
+        last_dim = -1
+        for d in sorted([d for d in self.ungroups.keys() if d >= 0]):
+            if d != last_dim + 1:
+                out.append("...")
+            ungroup = [str(i) for i in self.ungroups[d]]
+            ungroup[0] = "-1"
+            out.append(f"{d}({' '.join(ungroup)})")
+            last_dim = d
+        out.append("...")
+        neg_dims = sorted([d for d in self.ungroups.keys() if d < 0])
+        if len(neg_dims) > 0:
+            last_dim = neg_dims[0] - 1
+            for d in neg_dims:
+                if d != last_dim + 1:
+                    out.append("...")
+                ungroup = [str(i) for i in self.ungroups[d]]
+                ungroup[0] = "-1"
+                out.append(f"{d}({' '.join(ungroup)})")
+                last_dim = d
+            if last_dim != -1:
+                out.append("...")
+
+        return f"{' '.join(out)}"
+
 
 class GroupType(OpType):
     spec: Union[GroupSpec, UngroupSpec]
@@ -92,7 +164,7 @@ class GroupType(OpType):
 
     def __str__(self) -> str:
         inp_name = self.inputs["input"]
-        out = f"%{self.name}: %{inp_name}[{self.spec}]{self.debug_sources_to_str()}"
+        out = f"%{self.name}: {self.type}[{self.spec}](%{inp_name}){self.debug_sources_to_str()}"
         return out
 
     @property

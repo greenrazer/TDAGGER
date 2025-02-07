@@ -37,17 +37,10 @@ class ReduceSpec:
         if len(set(self.reduce_dimensions)) != len(self.reduce_dimensions):
             raise Exception("Duplicate dimensions in reduce_dimensions")
 
-    def format_dimensions(self, dimensions, exclude_dims=None):
-        # Filter out excluded dimensions
-        if exclude_dims is not None:
-            dimensions = [d for d in dimensions if d not in exclude_dims]
-
-        if not dimensions:
-            return "..."
-
+    def __str__(self):
         # Separate positive and negative numbers and sort them independently
-        pos_dims = sorted([d for d in dimensions if d >= 0])
-        neg_dims = sorted([d for d in dimensions if d < 0])
+        pos_dims = sorted([d for d in self.reduce_dimensions if d >= 0])
+        neg_dims = sorted([d for d in self.reduce_dimensions if d < 0])
 
         parts = []
         prev_included = False
@@ -59,7 +52,7 @@ class ReduceSpec:
                 if i in pos_dims:
                     if prev_included and parts[-1] != "..." and i != prev_num + 1:
                         parts.append("...")
-                    parts.append(str(i) if exclude_dims is None else f"({i})")
+                    parts.append(str(i))
                     prev_included = True
                     prev_num = i
                 elif prev_included:
@@ -77,7 +70,7 @@ class ReduceSpec:
                 if i in neg_dims:
                     if prev_included and parts[-1] != "..." and i != prev_num - 1:
                         parts.append("...")
-                    parts.append(str(i) if exclude_dims is None else f"({i})")
+                    parts.append(str(i))
                     prev_included = True
                     prev_num = i
                 elif prev_included:
@@ -92,13 +85,7 @@ class ReduceSpec:
         if not neg_dims or neg_dims[-1] != -1:
             parts.append("...")
 
-        return " ".join(parts)
-
-    def __str__(self):
-        # Clean up consecutive ellipses
-        input_str = self.format_dimensions(self.reduce_dimensions)
-
-        return f"{input_str} | {self.reduction_type}"
+        return f"{' '.join(parts)} | {self.reduction_type}"
 
 
 class ReduceType(OpType):

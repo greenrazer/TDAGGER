@@ -9,6 +9,28 @@ from .op_type import OpType
 class SqueezeSpec:
     dimensions: List[int]
 
+    def __str__(self):
+        out = []
+        last_dim = -1
+        for d in sorted([d for d in self.dimensions if d >= 0]):
+            if d != last_dim + 1:
+                out.append("...")
+            out.append(f"{d}")
+            last_dim = d
+        out.append("...")
+        neg_dims = sorted([d for d in self.dimensions if d < 0])
+        if len(neg_dims) > 0:
+            last_dim = neg_dims[0] - 1
+            for d in neg_dims:
+                if d != last_dim + 1:
+                    out.append("...")
+                out.append(f"{d}")
+                last_dim = d
+            if last_dim != -1:
+                out.append("...")
+
+        return " ".join(out)
+
     @property
     def type(self):
         return "squeeze"
@@ -17,6 +39,28 @@ class SqueezeSpec:
 @dataclass
 class UnsqueezeSpec:
     dimensions: List[int]
+
+    def __str__(self):
+        out = []
+        last_dim = -1
+        for d in sorted([d for d in self.dimensions if d >= 0]):
+            if d != last_dim + 1:
+                out.append("...")
+            out.append(f"{d}")
+            last_dim = d
+        out.append("...")
+        neg_dims = sorted([d for d in self.dimensions if d < 0])
+        if len(neg_dims) > 0:
+            last_dim = neg_dims[0] - 1
+            for d in neg_dims:
+                if d != last_dim + 1:
+                    out.append("...")
+                out.append(f"{d}")
+                last_dim = d
+            if last_dim != -1:
+                out.append("...")
+
+        return " ".join(out)
 
     @property
     def type(self):
@@ -34,7 +78,7 @@ class SqueezeType(OpType):
 
     def __str__(self) -> str:
         inp_name = self.inputs["input"]
-        out = f"%{self.name}: %{inp_name}[{self.spec}]{self.debug_sources_to_str()}"
+        out = f"%{self.name}: {self.type}[{self.spec}](%{inp_name}){self.debug_sources_to_str()}"
         return out
 
     @property
