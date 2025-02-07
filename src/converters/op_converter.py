@@ -58,7 +58,7 @@ class OpConverter(ABC, Generic[ContextT, ConverterT, InputT, OutputT]):
         4. Execute conversion
         """
         # Create context
-        ctx = self._create_context(op, *args, **kwargs)
+        context = self._create_context(op, *args, **kwargs)
 
         # Get operation key for converter lookup
         op_key = self._get_operation_key(op)
@@ -68,4 +68,4 @@ class OpConverter(ABC, Generic[ContextT, ConverterT, InputT, OutputT]):
             raise Exception(f"Unsupported operation type: {op_key}")
 
         # Execute conversion
-        return self._converters[op_key](ctx)
+        return self._converters[op_key](context)

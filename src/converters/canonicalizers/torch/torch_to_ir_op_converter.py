@@ -131,27 +131,27 @@ class TorchToIROpConverter(
     def _get_operation_key(self, torch_op: "torch._C.Node") -> str:
         return torch_op.kind()
 
-    def _inputs_to_names(self, ctx: ConversionContext) -> List[str]:
+    def _inputs_to_names(self, context: ConversionContext) -> List[str]:
         input_names = []
-        for input_value in ctx.torch_op.inputs():
-            if input_value in ctx.output_value_to_name:
-                in_name = ctx.output_value_to_name[input_value]
+        for input_value in context.torch_op.inputs():
+            if input_value in context.output_value_to_name:
+                in_name = context.output_value_to_name[input_value]
             else:
                 in_name = input_value.debugName().replace(".", "_")
 
             input_names.append(in_name)
         return input_names
 
-    def _inputs_to_nodes(self, ctx: ConversionContext) -> List[torch._C.Node]:
-        return [ctx.output_value_to_node[i] for i in ctx.torch_op.inputs()]
+    def _inputs_to_nodes(self, context: ConversionContext) -> List[torch._C.Node]:
+        return [context.output_value_to_node[i] for i in context.torch_op.inputs()]
 
-    def _inputs_to_torch_types(self, ctx):
-        return [i.type().kind() for i in ctx.torch_op.inputs()]
+    def _inputs_to_torch_types(self, context):
+        return [i.type().kind() for i in context.torch_op.inputs()]
 
-    def _inputs_constants_to_values(self, ctx):
+    def _inputs_constants_to_values(self, context):
         input_scalar_values = []
-        for input_value in ctx.torch_op.inputs():
-            node = ctx.output_value_to_node[input_value]
+        for input_value in context.torch_op.inputs():
+            node = context.output_value_to_node[input_value]
             # node is none if it is a placeholder
             if node is None or node.kind() not in ["prim::Constant"]:
                 input_scalar_values.append(None)
@@ -174,11 +174,11 @@ class TorchToIROpConverter(
         return input_scalar_values
 
     def _convert_binary_elementwise(
-        self, ctx: ConversionContext
+        self, context: ConversionContext
     ) -> Tuple[List[OpType], Dict[str, Union[ScalarType, TensorType]]]:
-        out_name = ctx.torch_op.output().debugName().replace(".", "_")
+        out_name = context.torch_op.output().debugName().replace(".", "_")
 
-        input_names = self._inputs_to_names(ctx)
+        input_names = self._inputs_to_names(context)
 
         # torch add unintuitively has 3 inputs a, b, and alpha for a + alpha*b
         # I will ignore the alpha parameter beacuse it is not nessisary,
@@ -186,36 +186,36 @@ class TorchToIROpConverter(
         bin_op = BinaryElementwiseType(
             name=out_name,
             inputs={"input_0": input_names[0], "input_1": input_names[1]},
-            spec=ATEN_TO_BINARY_ELEMENTWISE_SPEC[ctx.torch_op.kind()],
-            debug_sources=ctx.debug_sources,
+            spec=ATEN_TO_BINARY_ELEMENTWISE_SPEC[context.torch_op.kind()],
+            debug_sources=context.debug_sources,
         )
 
         return [bin_op], {}
 
     def _convert_unary_elementwise(
-        self, ctx: ConversionContext
+        self, context: ConversionContext
     ) -> Tuple[List[OpType], Dict[str, Union[ScalarType, TensorType]]]:
-        out_name = ctx.torch_op.output().debugName().replace(".", "_")
+        out_name = context.torch_op.output().debugName().replace(".", "_")
 
-        input_names = self._inputs_to_names(ctx)
+        input_names = self._inputs_to_names(context)
 
         unary_op = UnaryElementwiseType(
             name=out_name,
             inputs={"input": input_names[0]},
-            spec=ATEN_TO_UNARY_ELEMENTWISE_SPEC[ctx.torch_op.kind()],
-            debug_sources=ctx.debug_sources,
+            spec=ATEN_TO_UNARY_ELEMENTWISE_SPEC[context.torch_op.kind()],
+            debug_sources=context.debug_sources,
         )
 
         return [unary_op], {}
 
     def _convert_reduce(
-        self, ctx: ConversionContext
+        self, context: ConversionContext
     ) -> Tuple[List[OpType], Dict[str, Union[ScalarType, TensorType]]]:
-        out_name = ctx.torch_op.output().debugName().replace(".", "_")
+        out_name = context.torch_op.output().debugName().replace(".", "_")
 
-        input_names = self._inputs_to_names(ctx)
-        input_types = self._inputs_to_torch_types(ctx)
-        input_constant_values = self._inputs_constants_to_values(ctx)
+        input_names = self._inputs_to_names(context)
+        input_types = self._inputs_to_torch_types(context)
+        input_constant_values = self._inputs_constants_to_values(context)
 
         reduce_dimensions = (
             input_constant_values[1]
@@ -227,82 +227,82 @@ class TorchToIROpConverter(
         reduction_spec = ReduceSpec(
             reduce_dimensions=reduce_dimensions,
             squeeze_dimensions=squeeze_dimensions,
-            reduction_type=ATEN_TO_REDUCE_SPEC_TYPE[ctx.torch_op.kind()],
+            reduction_type=ATEN_TO_REDUCE_SPEC_TYPE[context.torch_op.kind()],
         )
 
         reduction_op = ReduceType(
             out_name,
             {"input": input_names[0]},
             reduction_spec,
-            debug_sources=ctx.debug_sources,
+            debug_sources=context.debug_sources,
         )
 
         return [reduction_op], {}
 
     def _convert_relu(
-        self, ctx: ConversionContext
+        self, context: ConversionContext
     ) -> Tuple[List[OpType], Dict[str, Union[ScalarType, TensorType]]]:
-        out_name = ctx.torch_op.output().debugName().replace(".", "_")
+        out_name = context.torch_op.output().debugName().replace(".", "_")
 
-        input_names = self._inputs_to_names(ctx)
+        input_names = self._inputs_to_names(context)
         return self._create_relu(
-            out_name, input_names[0], debug_sources=ctx.debug_sources
+            out_name, input_names[0], debug_sources=context.debug_sources
         )
 
     def _convert_leaky_relu(
-        self, ctx: ConversionContext
+        self, context: ConversionContext
     ) -> Tuple[List[OpType], Dict[str, Union[ScalarType, TensorType]]]:
-        out_name = ctx.torch_op.output().debugName().replace(".", "_")
+        out_name = context.torch_op.output().debugName().replace(".", "_")
 
-        input_names = self._inputs_to_names(ctx)
+        input_names = self._inputs_to_names(context)
         return self._create_leaky_relu(
             out_name,
             input_names[0],
             input_names[1],
-            debug_sources=ctx.debug_sources,
+            debug_sources=context.debug_sources,
         )
 
     def _convert_softplus(
-        self, ctx: ConversionContext
+        self, context: ConversionContext
     ) -> Tuple[List[OpType], Dict[str, Union[ScalarType, TensorType]]]:
-        out_name = ctx.torch_op.output().debugName().replace(".", "_")
+        out_name = context.torch_op.output().debugName().replace(".", "_")
 
-        input_names = self._inputs_to_names(ctx)
+        input_names = self._inputs_to_names(context)
         return self._create_softplus(
             out_name,
             input_names[0],
             input_names[1],
-            debug_sources=ctx.debug_sources,
+            debug_sources=context.debug_sources,
         )
 
     def _convert_permute(
-        self, ctx: ConversionContext
+        self, context: ConversionContext
     ) -> Tuple[List[OpType], Dict[str, Union[ScalarType, TensorType]]]:
-        out_name = ctx.torch_op.output().debugName().replace(".", "_")
+        out_name = context.torch_op.output().debugName().replace(".", "_")
 
-        input_names = self._inputs_to_names(ctx)
-        input_constant_values = self._inputs_constants_to_values(ctx)
+        input_names = self._inputs_to_names(context)
+        input_constant_values = self._inputs_constants_to_values(context)
 
         permute_op = PermuteType(
             name=out_name,
             inputs={"input": input_names[0]},
             spec=PermuteSpec(new_permutation=input_constant_values[1]),
-            debug_sources=ctx.debug_sources,
+            debug_sources=context.debug_sources,
         )
 
         return [permute_op], {}
 
     def _convert_index(
-        self, ctx: ConversionContext
+        self, context: ConversionContext
     ) -> Tuple[List[OpType], Dict[str, Union[ScalarType, TensorType]]]:
-        out_name = ctx.torch_op.output().debugName().replace(".", "_")
+        out_name = context.torch_op.output().debugName().replace(".", "_")
 
-        input_names = self._inputs_to_names(ctx)
-        input_constant_values = self._inputs_constants_to_values(ctx)
+        input_names = self._inputs_to_names(context)
+        input_constant_values = self._inputs_constants_to_values(context)
 
-        if ctx.torch_op.kind() == "aten::select":
+        if context.torch_op.kind() == "aten::select":
             index_obj = input_constant_values[2]
-        elif ctx.torch_op.kind() == "aten::slice":
+        elif context.torch_op.kind() == "aten::slice":
             # step can never be negitive in pytorch slices
             match (
                 input_constant_values[2],
@@ -321,19 +321,19 @@ class TorchToIROpConverter(
             out_name,
             {"input": input_names[0]},
             index_spec,
-            debug_sources=ctx.debug_sources,
+            debug_sources=context.debug_sources,
         )
 
         return [index_op], {}
 
     def _convert_reshape(
-        self, ctx: ConversionContext
+        self, context: ConversionContext
     ) -> Tuple[List[OpType], Dict[str, Union[ScalarType, TensorType]]]:
-        out_name = ctx.torch_op.output().debugName().replace(".", "_")
-        input_names = self._inputs_to_names(ctx)
-        input_constant_values = self._inputs_constants_to_values(ctx)
+        out_name = context.torch_op.output().debugName().replace(".", "_")
+        input_names = self._inputs_to_names(context)
+        input_constant_values = self._inputs_constants_to_values(context)
 
-        input_shape = ctx.torch_op.inputsAt(0).type().sizes()
+        input_shape = context.torch_op.inputsAt(0).type().sizes()
         output_shape = input_constant_values[1]
 
         spec_list = GroupType.specs_from_reshape(input_shape, output_shape)
@@ -345,7 +345,7 @@ class TorchToIROpConverter(
                     f"{out_name}_{s.type}",
                     inputs={"input": input_names[0]},
                     spec=s,
-                    debug_sources=ctx.debug_sources,
+                    debug_sources=context.debug_sources,
                 )
             )
 
@@ -354,20 +354,20 @@ class TorchToIROpConverter(
                 f"{out_name}",
                 inputs={"input": input_names[0] if len(out) == 0 else out[-1].name},
                 spec=spec_list[-1],
-                debug_sources=ctx.debug_sources,
+                debug_sources=context.debug_sources,
             )
         )
 
         return out, {}
 
     def _convert_pad(
-        self, ctx: ConversionContext
+        self, context: ConversionContext
     ) -> Tuple[List[OpType], Dict[str, Union[ScalarType, TensorType]]]:
-        out_name = ctx.torch_op.output().debugName().replace(".", "_")
-        input_names = self._inputs_to_names(ctx)
-        input_constant_values = self._inputs_constants_to_values(ctx)
+        out_name = context.torch_op.output().debugName().replace(".", "_")
+        input_names = self._inputs_to_names(context)
+        input_constant_values = self._inputs_constants_to_values(context)
 
-        input_shape = ctx.torch_op.inputsAt(0).type().sizes()
+        input_shape = context.torch_op.inputsAt(0).type().sizes()
         input_pad = input_constant_values[1]
         pad_constant = (
             0 if input_constant_values[3] is None else input_constant_values[3]
@@ -394,23 +394,23 @@ class TorchToIROpConverter(
             spec=PadSpec(
                 pad=pad_dict, pad_mode=pad_mode, _ouptut_dims_sidecar=len(input_shape)
             ),
-            debug_sources=ctx.debug_sources,
+            debug_sources=context.debug_sources,
         )
 
         return [pad_op], {}
 
     def _convert_fold(
-        self, ctx: ConversionContext
+        self, context: ConversionContext
     ) -> Tuple[List[OpType], Dict[str, Union[ScalarType, TensorType]]]:
-        out_name = ctx.torch_op.output().debugName().replace(".", "_")
-        input_names = self._inputs_to_names(ctx)
-        input_constant_values = self._inputs_constants_to_values(ctx)
+        out_name = context.torch_op.output().debugName().replace(".", "_")
+        input_names = self._inputs_to_names(context)
+        input_constant_values = self._inputs_constants_to_values(context)
 
-        input_shape = ctx.torch_op.inputsAt(0).type().sizes()
+        input_shape = context.torch_op.inputsAt(0).type().sizes()
         output = []
 
         # currently kernel must be 2d and only affects the last 2 dimensions
-        if ctx.torch_op.kind() == "aten::im2col":
+        if context.torch_op.kind() == "aten::im2col":
             kernel_shape = input_constant_values[1]
             dilation = input_constant_values[2]
             padding = input_constant_values[3]
@@ -429,7 +429,7 @@ class TorchToIROpConverter(
                     spec=PadSpec(
                         pad=pad_dict, pad_mode=0, _ouptut_dims_sidecar=len(input_shape)
                     ),
-                    debug_sources=ctx.debug_sources,
+                    debug_sources=context.debug_sources,
                 )
                 output.append(pad_op)
 
@@ -458,14 +458,14 @@ class TorchToIROpConverter(
                     "input": input_names[0] if len(output) == 0 else output[-1].name
                 },
                 spec=spec,
-                debug_sources=ctx.debug_sources,
+                debug_sources=context.debug_sources,
             )
 
             output.append(unfold_op)
 
             return output, {}
-        elif ctx.torch_op.kind() == "aten::col2im":
-            input_shape = ctx.torch_op.inputsAt(0).type().sizes()
+        elif context.torch_op.kind() == "aten::col2im":
+            input_shape = context.torch_op.inputsAt(0).type().sizes()
             h, w = input_constant_values[1]
             kernel_shape = input_constant_values[2]
             kernel_size = kernel_shape[0] * kernel_shape[1]
@@ -494,7 +494,7 @@ class TorchToIROpConverter(
                 name=f"{out_name}_fold" if has_padding else out_name,
                 inputs={"input": input_names[0]},
                 spec=spec,
-                debug_sources=ctx.debug_sources,
+                debug_sources=context.debug_sources,
             )
 
             output.append(fold_op)
@@ -509,11 +509,11 @@ class TorchToIROpConverter(
                     name=out_name,
                     inputs={"input": fold_op.name},
                     spec=IndexSpec(index=index_dict),
-                    debug_sources=ctx.debug_sources,
+                    debug_sources=context.debug_sources,
                 )
                 output.append(index_op)
 
         else:
-            raise Exception(f"Unknown torch fold op: {ctx.torch_op.kind()}.")
+            raise Exception(f"Unknown torch fold op: {context.torch_op.kind()}.")
 
         return output, {}
