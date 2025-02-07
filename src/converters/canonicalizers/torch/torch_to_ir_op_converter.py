@@ -406,49 +406,118 @@ class TorchToIROpConverter(
         input_names = self._inputs_to_names(ctx)
         input_constant_values = self._inputs_constants_to_values(ctx)
 
+        input_shape = ctx.torch_op.inputsAt(0).type().sizes()
+        output = []
+
         # currently kernel must be 2d and only affects the last 2 dimensions
         if ctx.torch_op.kind() == "aten::im2col":
-            # padding = input_constant_values[3]
             kernel_shape = input_constant_values[1]
             dilation = input_constant_values[2]
+            padding = input_constant_values[3]
+            has_padding = any([p > 0 for p in padding])
             stride = input_constant_values[4]
+
+            if has_padding:
+                pad_dict = {
+                    (i + len(input_shape) - 2): (p, p)
+                    for i, p in enumerate(padding)
+                    if p > 0
+                }
+                pad_op = PadType(
+                    name=f"{out_name}_pad",
+                    inputs={"input": input_names[0]},
+                    spec=PadSpec(
+                        pad=pad_dict, 
+                        pad_mode=0, 
+                        _ouptut_dims_sidecar=len(input_shape)
+                    ),
+                    debug_sources=ctx.debug_sources,
+                )
+                output.append(pad_op)
+
             unfold_dict = {
-                (i + 2): (k, s, d)
+                (i  + len(input_shape) - 2): (k, s, d)
                 for i, (k, s, d) in enumerate(zip(kernel_shape, stride, dilation))
                 if k != 0
             }
-            spec = UnfoldSpec(unfold=unfold_dict)
+            def out_size(d):
+                return (input_shape[d] + 2 * padding[d] - dilation[d] * (kernel_shape[d] - 1) - 1) / stride[d] + 1
+            out_shape = []
+            if len(input_shape) == 4:
+                out_shape.append(input_shape[-4])
+            out_shape.extend([
+                input_shape[-3],
+                out_size(-2),
+                out_size(-1)
+            ])
+            spec = UnfoldSpec(
+                unfold=unfold_dict,
+                _output_shape_sidecar=out_shape
+            )
+            unfold_op = FoldType(
+                name= out_name,
+                inputs={"input": input_names[0] if len(output) == 0 else output[-1].name},
+                spec=spec,
+                debug_sources=ctx.debug_sources,
+            )
+
+            output.append(unfold_op)
+
+            return output, {}
         elif ctx.torch_op.kind() == "aten::col2im":
             input_shape = ctx.torch_op.inputsAt(0).type().sizes()
             h, w = input_constant_values[1]
             kernel_shape = input_constant_values[2]
             kernel_size = kernel_shape[0] * kernel_shape[1]
             dilation = input_constant_values[3]
-            # padding = input_constant_values[4]
+            padding = input_constant_values[4]
+            has_padding = any([p > 0 for p in padding])
             stride = input_constant_values[5]
 
             unfold_dict = {
-                (i + 2): (k, s, d)
+                (i + len(input_shape) - 1): (k, s, d)
                 for i, (k, s, d) in enumerate(zip(kernel_shape, stride, dilation))
                 if k != 0
             }
+            out_shape = []
+            if len(input_shape) == 3:
+                out_shape.append(input_shape[-3])
+            out_shape.extend([
+                input_shape[-2]//kernel_size,
+                h + padding[-2],
+                w + padding[-1]
+            ])
+            # the outside equation should be (input_shape[d] - 1) * stride[d] - 2 * padding[d] + dilation[d] * (kernel_size[d] - 1) + 1
             spec = FoldSpec(
                 fold=unfold_dict,
-                _output_shape_sidecar=[
-                    input_shape[0],
-                    input_shape[1] // kernel_size,
-                    h,
-                    w,
-                ],
+                _output_shape_sidecar=out_shape,
             )
+            fold_op = FoldType(
+                name=f"{out_name}_fold" if has_padding else out_name,
+                inputs={"input": input_names[0]},
+                spec=spec,
+                debug_sources=ctx.debug_sources,
+            )
+
+            output.append(fold_op)
+
+            if has_padding:
+                index_dict = {
+                    (i  + len(input_shape) - 1): (p, -p, 1)
+                    for i, p in enumerate(padding)
+                    if p > 0
+                }
+                index_op = IndexType(
+                    name=out_name,
+                    inputs={"input": fold_op.name},
+                    spec=IndexSpec(
+                        index=index_dict
+                    ),
+                    debug_sources=ctx.debug_sources,
+                )
+                output.append(index_op)
+            
         else:
             raise Exception(f"Unknown torch fold op: {ctx.torch_op.kind()}.")
-
-        unfold_op = FoldType(
-            name=out_name,
-            inputs={"input": input_names[0]},
-            spec=spec,
-            debug_sources=ctx.debug_sources,
-        )
-
-        return [unfold_op], {}
+        
+        return output, {}

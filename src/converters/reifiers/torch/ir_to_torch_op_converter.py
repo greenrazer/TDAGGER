@@ -235,12 +235,13 @@ class IRToTorchOpConverter(OpConverter[ConversionContext, Callable, OpType, List
         num_removed = 0
         nodes = []
 
+        last_inp = input_val
         for i in sorted_inds:
             curr_val = ctx.op.spec.index[i]
             if isinstance(curr_val, tuple):
                 node = ctx.torch_graph.create("aten::slice")
 
-                node.addInput(input_val)
+                node.addInput(last_inp)
                 node.addInput(ctx.torch_graph.insertConstant(i - num_removed))
                 node.addInput(ctx.torch_graph.insertConstant(curr_val[0]))
                 # from inclusive to exclusive end
@@ -252,7 +253,7 @@ class IRToTorchOpConverter(OpConverter[ConversionContext, Callable, OpType, List
             else:
                 node = ctx.torch_graph.create("aten::select")
 
-                node.addInput(input_val)
+                node.addInput(last_inp)
                 node.addInput(ctx.torch_graph.insertConstant(i - num_removed))
                 node.addInput(ctx.torch_graph.insertConstant(curr_val))
 
@@ -261,6 +262,7 @@ class IRToTorchOpConverter(OpConverter[ConversionContext, Callable, OpType, List
             node.output().setType(torch._C.TensorType.get())
 
             nodes.append(node)
+            last_inp = node.output()
 
         return nodes
 
@@ -321,8 +323,10 @@ class IRToTorchOpConverter(OpConverter[ConversionContext, Callable, OpType, List
             case _:
                 raise Exception(f"Fold type Unknown: {ctx.op.spec.type}")
 
-        kernel_h, stride_h, dilation_h = fold_dict[2] if 2 in fold_dict else (0, 0, 0)
-        kernel_w, stride_w, dilation_w = fold_dict[3] if 3 in fold_dict else (0, 0, 0)
+        key_0 = 0 + len(ctx.op.spec._output_shape_sidecar) - 2
+        key_1 = 1 + len(ctx.op.spec._output_shape_sidecar) - 2
+        kernel_h, stride_h, dilation_h = fold_dict[key_0] if key_0 in fold_dict else (0, 0, 0)
+        kernel_w, stride_w, dilation_w = fold_dict[key_1] if key_1 in fold_dict else (0, 0, 0)
         kernel = [kernel_h, kernel_w]
         stride = [stride_h, stride_w]
         dilation = [dilation_h, dilation_w]

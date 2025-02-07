@@ -21,6 +21,9 @@ class FoldSpec:
 class UnfoldSpec:
     unfold: Dict[int, Tuple[int, int, int]]
 
+    # TODO: remove and propagate shape through network
+    _output_shape_sidecar: List[int]
+
     @property
     def type(self) -> str:
         return "unfold"
