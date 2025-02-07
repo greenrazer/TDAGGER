@@ -68,4 +68,4 @@ class OpConverter(ABC, Generic[ContextT, ConverterT, InputT, OutputT]):
             raise Exception(f"Unsupported operation type: {op_key}")
 
         # Execute conversion
-        return self._converters[op_key](context)
+        return self._converters[op_key](context, op)
