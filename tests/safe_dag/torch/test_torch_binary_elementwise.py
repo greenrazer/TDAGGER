@@ -23,7 +23,7 @@ class TestTorchBinaryElementwise(unittest.TestCase):
         self.model = BinaryElementwise()
         self.example_input = (
             torch.rand((10, 20, 30, 40)),
-            torch.rand((10, 20, 30, 40)),
+            torch.rand((10, 20, 30, 40)) + 0.01,
         )
         self.traced_model = torch.jit.trace(self.model, self.example_input)
         self.safe_dag = SafeDAG.from_torchscript(self.traced_model)
