@@ -12,8 +12,8 @@ from ....ir.safe_ir import (
     FoldType,
     GroupSpec,
     GroupType,
-    IndexSpec,
-    IndexType,
+    SliceSpec,
+    SliceType,
     OpType,
     PadSpec,
     PadType,
@@ -339,9 +339,9 @@ class TorchToIROpConverter(
                     # end - 1 because inclusive indexing
                     index_obj = (begin, end - 1, step)
 
-        index_spec = IndexSpec(index={input_constant_values[1]: index_obj})
+        index_spec = SliceSpec(index={input_constant_values[1]: index_obj})
 
-        index_op = IndexType(
+        index_op = SliceType(
             out_name,
             {"input": input_names[0]},
             index_spec,
@@ -537,10 +537,10 @@ class TorchToIROpConverter(
                     for i, p in enumerate(padding)
                     if p > 0
                 }
-                index_op = IndexType(
+                index_op = SliceType(
                     name=out_name,
                     inputs={"input": fold_op.name},
-                    spec=IndexSpec(index=index_dict),
+                    spec=SliceSpec(index=index_dict),
                     debug_sources=context.debug_sources,
                 )
                 output.append(index_op)

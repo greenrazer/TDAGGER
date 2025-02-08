@@ -6,7 +6,7 @@ from .op_type import OpType
 
 
 @dataclass
-class IndexSpec:
+class SliceSpec:
     index: Dict[
         int, Union[int, Tuple[int, int, int]]
     ]  # slice end indexes are inclusive
@@ -98,10 +98,10 @@ class IndexSpec:
         return " ".join(parts)
 
 
-class IndexType(OpType):
-    spec: IndexSpec
+class SliceType(OpType):
+    spec: SliceSpec
 
-    def __init__(self, name, inputs, spec: IndexSpec, debug_sources=[]):
+    def __init__(self, name, inputs, spec: SliceSpec, debug_sources=[]):
         super().__init__(name, inputs, debug_sources=debug_sources)
         self.spec = spec
 

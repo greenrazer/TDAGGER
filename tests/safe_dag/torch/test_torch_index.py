@@ -6,7 +6,7 @@ import torch.nn as nn
 from src.safe_dag import SafeDAG
 
 
-class IndexSlice(nn.Module):
+class SliceSlice(nn.Module):
     def __init__(self):
         super().__init__()
 
@@ -19,9 +19,9 @@ class IndexSlice(nn.Module):
         return x
 
 
-class TestTorchIndexSlice(unittest.TestCase):
+class TestTorchSliceSlice(unittest.TestCase):
     def setUp(self):
-        self.model = IndexSlice()
+        self.model = SliceSlice()
         self.example_input = torch.rand((8, 32, 32, 4, 5, 6, 7))
 
         self.traced_model = torch.jit.trace(self.model, self.example_input)

@@ -133,7 +133,6 @@ class UngroupSpec:
             if d != last_dim + 1:
                 out.append("...")
             ungroup = [str(i) for i in self.ungroups[d]]
-            ungroup[0] = "-1"
             out.append(f"{d}({' '.join(ungroup)})")
             last_dim = d
         out.append("...")
@@ -144,7 +143,6 @@ class UngroupSpec:
                 if d != last_dim + 1:
                     out.append("...")
                 ungroup = [str(i) for i in self.ungroups[d]]
-                ungroup[0] = "-1"
                 out.append(f"{d}({' '.join(ungroup)})")
                 last_dim = d
             if last_dim != -1:
