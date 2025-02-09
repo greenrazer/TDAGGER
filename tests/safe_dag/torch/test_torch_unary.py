@@ -9,8 +9,6 @@ from src.safe_dag import SafeDAG
 class Unary(nn.Module):
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         x = -x
-        x = torch.abs(x)
-        x = torch.sqrt(x)
         x = torch.exp(x)
         x = torch.log(x)
 
@@ -27,6 +25,7 @@ class Unary(nn.Module):
         x = torch.arccosh(x)
         x = torch.arcsinh(x)
 
+        x = torch.abs(x)
         x = torch.relu(x)
         x = torch.nn.functional.leaky_relu(x)
         x = torch.nn.functional.softplus(x)
