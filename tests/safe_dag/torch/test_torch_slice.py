@@ -11,9 +11,9 @@ class SliceSlice(nn.Module):
         super().__init__()
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        x = x[:, 2:-2, 1, ::2, :, :, 0]
+        x = x[:, 2:-2, 1, :, :, :, 0]
         x = x[0, :, 1, ...]
-        x = x[:, 1:15:2, 2:20:3]
+        x = x[:, 1:15, 2:20]
         x = x[..., 1:2, :2]
         x = x[1:2, 0]
         return x

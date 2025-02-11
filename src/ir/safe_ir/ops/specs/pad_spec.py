@@ -1,18 +1,20 @@
 from dataclasses import dataclass
 from enum import Enum, auto
-from typing import Any, Dict, List, Set, Tuple, Union
+from typing import Any, Dict, List, Set, Tuple, Type, Union
 
-from .op_type import OpType
+from ..inputs.op_input import OpInput
+from ..inputs.unary_tensor_input import UnaryTensorInput
+from .op_spec import OpSpec
 
 
 @dataclass
-class PadSpec:
+class PadSpec(OpSpec):
     class PadMode(Enum):
         REFLECT = auto()
         CIRCULAR = auto()
         CLOSEST_EDGE = auto()
 
-        def from_str(pad_str: str) -> "PadSpec":
+        def from_str(pad_str: str) -> "PadSpec.PadMode":
             match pad_str:
                 case "reflect":
                     return PadSpec.PadMode.REFLECT
@@ -41,7 +43,18 @@ class PadSpec:
     # TODO: remove and propagate dims through network
     _ouptut_dims_sidecar: int
 
-    def __str__(self):
+    @property
+    def type(self) -> str:
+        return "pad"
+
+    @property
+    def input_type(self) -> Type[OpInput]:
+        return UnaryTensorInput
+
+    def format_input(self, input: UnaryTensorInput) -> str:
+        return f"{self.type}[{self._op_string()}](%{input.input})"
+
+    def _op_string(self) -> str:
         out = []
         last_dim = -1
         for d in sorted([d for d in self.pad.keys() if d >= 0]):
@@ -51,11 +64,11 @@ class PadSpec:
                 case (0, 0):
                     continue
                 case (0, r):
-                    out.append(f"{d} -> {r}")
+                    out.append(f"{{{d}: after={r}}}")
                 case (l, 0):
-                    out.append(f"{l} <- {d}")
+                    out.append(f"{{{d}: before={l}}}")
                 case (l, r):
-                    out.append(f"{l} <- {d} -> {r}")
+                    out.append(f"{{{d}: before={l} after={r}}}")
             last_dim = d
         out.append("...")
         neg_dims = sorted([d for d in self.pad.keys() if d < 0])
@@ -68,36 +81,13 @@ class PadSpec:
                     case (0, 0):
                         continue
                     case (0, r):
-                        out.append(f"{d} -> {r}")
+                        out.append(f"{{{d}: after={r}}}")
                     case (l, 0):
-                        out.append(f"{l} <- {d}")
+                        out.append(f"{{{d}: before={l}}}")
                     case (l, r):
-                        out.append(f"{l} <- {d} -> {r}")
+                        out.append(f"{{{d}: before={l} after={r}}}")
                 last_dim = d
             if last_dim != -1:
                 out.append("...")
 
-        return f"{' '.join(out)} | pad_mode={self.pad_mode}"
-
-
-class PadType(OpType):
-    spec: PadSpec
-
-    def __init__(self, name, inputs, spec: PadSpec, debug_sources=[]):
-        super().__init__(name, inputs, debug_sources=debug_sources)
-        self.spec = spec
-
-    def __str__(self) -> str:
-        inp_name = self.inputs["input"]
-        out = (
-            f"%{self.name}: pad[{self.spec}](%{inp_name}){self.debug_sources_to_str()}"
-        )
-        return out
-
-    @property
-    def type(self) -> str:
-        return "pad"
-
-    @property
-    def required_input_keys(self) -> List[str]:
-        return ["input"]
+        return f"{' '.join(out)} | mode={self.pad_mode}"

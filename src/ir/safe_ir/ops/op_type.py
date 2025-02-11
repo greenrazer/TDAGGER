@@ -1,42 +1,33 @@
 from abc import ABC, abstractmethod
 from typing import Dict, List, Set, Tuple, Union
 
+from .inputs.op_input import OpInput
+from .specs.op_spec import OpSpec
+
 
 class OpType(ABC):
     name: str
 
-    inputs: Dict[str, Union[str, List[str]]]
-    unique_indices: Set[str]
+    spec: OpSpec
+    input: OpInput
 
     debug_sources: List[Tuple[str, str, str]] = []
 
     def __init__(
         self,
         name: str,
-        inputs: Dict[str, Union[str, List[str]]],
+        spec: OpSpec,
+        input: OpInput,
         debug_sources: List[Tuple[str, str, str]] = [],
     ):
         self.name = name
-        self.inputs = inputs
-        self.unique_indices = set()
-        self._process_inputs()
+        self.spec = spec
+        self.input = input
+        if not isinstance(self.input, self.spec.input_type):
+            raise Exception(
+                f"input {type(self.input)} not valid for spec for {name}({self.spec.input_type})"
+            )
         self.debug_sources = debug_sources
-
-    def __post_init__(self):
-        for s in self.required_input_keys:
-            if s not in self.inputs:
-                raise Exception(f"Validation Failed: {s} not found in inputs")
-
-    def _process_inputs(self):
-        for _, val in self.inputs.items():
-            if isinstance(val, list):
-                for index in val:
-                    self.unique_indices.add(index)
-            elif isinstance(val, str):
-                index = val
-                self.unique_indices.add(index)
-            else:
-                raise Exception("inputs can only be a reference or list of references")
 
     def debug_sources_to_str(self) -> str:
         if len(self.debug_sources) > 0:
@@ -44,12 +35,5 @@ class OpType(ABC):
         else:
             return ""
 
-    @property
-    @abstractmethod
-    def type(self) -> str:
-        pass
-
-    @property
-    @abstractmethod
-    def required_input_keys(self) -> List[str]:
-        pass
+    def __str__(self):
+        return f"%{self.name}: {self.spec.format_input(self.input)}{self.debug_sources_to_str()}"

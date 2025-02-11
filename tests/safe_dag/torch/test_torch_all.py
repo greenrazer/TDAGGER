@@ -25,7 +25,7 @@ class All(nn.Module):
         )
         x = x[:, :10, 10:, 10:-10]
         x = torch.nn.functional.pad(x, (1, 1, 2, 0, 0, 2, 1, 1))
-        x = x.permute(1,2,3,0)
+        x = x.permute(1, 2, 3, 0)
         x = torch.sum(x, dim=(0, -1))
         x = x.reshape(2, 11, 11, 2)
         x = x.unsqueeze(0)
@@ -36,6 +36,7 @@ class All(nn.Module):
         x = torch.nn.functional.leaky_relu(x)
 
         return x
+
 
 class TestTorchAll(unittest.TestCase):
     def setUp(self):

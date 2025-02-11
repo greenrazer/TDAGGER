@@ -6,67 +6,68 @@ import torch
 
 from ....ir.safe_ir import (
     BinaryElementwiseSpec,
-    BinaryElementwiseType,
+    BinaryTensorInput,
+    DataHolderType,
     DataType,
     FoldSpec,
-    FoldType,
     GroupSpec,
-    GroupType,
-    SliceSpec,
-    SliceType,
+    InterleaveSpec,
+    OpInput,
+    OpSpec,
     OpType,
     PadSpec,
-    PadType,
     PermuteSpec,
-    PermuteType,
     ReduceSpec,
-    ReduceType,
+    RepeatSpec,
+    ScalarSpec,
     ScalarType,
+    SliceSpec,
+    SpecType,
     SqueezeSpec,
-    SqueezeType,
+    StrideSpec,
     TensorSpec,
     TensorType,
     UnaryElementwiseSpec,
-    UnaryElementwiseType,
+    UnaryTensorInput,
     UnfoldSpec,
     UngroupSpec,
     UnsqueezeSpec,
 )
 from ..canon_op_converter import CanonOpConverter
+from .group_helpers import specs_from_reshape
 
 ATEN_TO_UNARY_ELEMENTWISE_SPEC = {
-    "aten::abs": UnaryElementwiseSpec.ABSOLUTE_VALUE,
-    "aten::neg": UnaryElementwiseSpec.NEGATIVE,
-    "aten::sqrt": UnaryElementwiseSpec.SQUARE_ROOT,
-    "aten::exp": UnaryElementwiseSpec.EXP,
-    "aten::log": UnaryElementwiseSpec.LOG,
-    "aten::sin": UnaryElementwiseSpec.SIN,
-    "aten::cos": UnaryElementwiseSpec.COS,
-    "aten::tan": UnaryElementwiseSpec.TAN,
-    "aten::asin": UnaryElementwiseSpec.ARCSIN,
-    "aten::acos": UnaryElementwiseSpec.ARCCOS,
-    "aten::atan": UnaryElementwiseSpec.ARCTAN,
-    "aten::sinh": UnaryElementwiseSpec.SINH,
-    "aten::cosh": UnaryElementwiseSpec.COSH,
-    "aten::tanh": UnaryElementwiseSpec.TANH,
-    "aten::asinh": UnaryElementwiseSpec.ARCSINH,
-    "aten::acosh": UnaryElementwiseSpec.ARCCOSH,
-    "aten::atanh": UnaryElementwiseSpec.ARCTANH,
+    "aten::sign": UnaryElementwiseSpec.UnaryElementwiseType.SIGN,
+    "aten::neg": UnaryElementwiseSpec.UnaryElementwiseType.NEGATIVE,
+    "aten::reciprocal": UnaryElementwiseSpec.UnaryElementwiseType.RECIPROCAL,
+    "aten::exp": UnaryElementwiseSpec.UnaryElementwiseType.EXP,
+    "aten::log": UnaryElementwiseSpec.UnaryElementwiseType.LOG,
+    "aten::sin": UnaryElementwiseSpec.UnaryElementwiseType.SIN,
+    "aten::cos": UnaryElementwiseSpec.UnaryElementwiseType.COS,
+    "aten::tan": UnaryElementwiseSpec.UnaryElementwiseType.TAN,
+    "aten::asin": UnaryElementwiseSpec.UnaryElementwiseType.ARCSIN,
+    "aten::acos": UnaryElementwiseSpec.UnaryElementwiseType.ARCCOS,
+    "aten::atan": UnaryElementwiseSpec.UnaryElementwiseType.ARCTAN,
+    "aten::sinh": UnaryElementwiseSpec.UnaryElementwiseType.SINH,
+    "aten::cosh": UnaryElementwiseSpec.UnaryElementwiseType.COSH,
+    "aten::tanh": UnaryElementwiseSpec.UnaryElementwiseType.TANH,
+    "aten::asinh": UnaryElementwiseSpec.UnaryElementwiseType.ARCSINH,
+    "aten::acosh": UnaryElementwiseSpec.UnaryElementwiseType.ARCCOSH,
+    "aten::atanh": UnaryElementwiseSpec.UnaryElementwiseType.ARCTANH,
 }
 
 ATEN_TO_BINARY_ELEMENTWISE_SPEC = {
-    "aten::add": BinaryElementwiseSpec.ADD,
-    "aten::sub": BinaryElementwiseSpec.SUBTRACT,
-    "aten::mul": BinaryElementwiseSpec.MULTIPLY,
-    "aten::div": BinaryElementwiseSpec.DIVIDE,
+    "aten::add": BinaryElementwiseSpec.BinaryElementwiseType.ADD,
+    "aten::mul": BinaryElementwiseSpec.BinaryElementwiseType.MULTIPLY,
+    "aten::pow": BinaryElementwiseSpec.BinaryElementwiseType.EXPONENTIATE,
 }
 
 ATEN_TO_REDUCE_SPEC_TYPE = {
     "aten::sum": ReduceSpec.ReductionType.SUM,
+    "aten::prod": ReduceSpec.ReductionType.PRODUCT,
+    "aten::amax": ReduceSpec.ReductionType.MAXIMUM,
+    "aten::amin": ReduceSpec.ReductionType.MINIMUM,
     "aten::mean": ReduceSpec.ReductionType.MEAN,
-    "aten::amax": ReduceSpec.ReductionType.MAX,
-    "aten::amin": ReduceSpec.ReductionType.MIN,
-    "aten::prod": ReduceSpec.ReductionType.PROD,
 }
 
 
@@ -102,6 +103,9 @@ class TorchToIROpConverter(
 
         self._converters.update(
             {
+                "aten::sub": self._convert_subtract,
+                "aten::div": self._convert_divide,
+                "aten::abs": self._convert_abs,
                 "aten::relu": self._convert_relu,
                 "aten::leaky_relu": self._convert_leaky_relu,
                 "aten::softplus": self._convert_softplus,
@@ -195,10 +199,12 @@ class TorchToIROpConverter(
         # torch add unintuitively has 3 inputs a, b, and alpha for a + alpha*b
         # I will ignore the alpha parameter beacuse it is not nessisary,
         # and if someone is using it they are doing something wrong
-        bin_op = BinaryElementwiseType(
+        bin_op = OpType(
             name=out_name,
-            inputs={"input_0": input_names[0], "input_1": input_names[1]},
-            spec=ATEN_TO_BINARY_ELEMENTWISE_SPEC[torch_op.kind()],
+            input=BinaryTensorInput(input_names[0], input_names[1]),
+            spec=BinaryElementwiseSpec(
+                ATEN_TO_BINARY_ELEMENTWISE_SPEC[torch_op.kind()]
+            ),
             debug_sources=context.debug_sources,
         )
 
@@ -211,10 +217,10 @@ class TorchToIROpConverter(
 
         input_names = self._inputs_to_names(context, torch_op)
 
-        unary_op = UnaryElementwiseType(
+        unary_op = OpType(
             name=out_name,
-            inputs={"input": input_names[0]},
-            spec=ATEN_TO_UNARY_ELEMENTWISE_SPEC[torch_op.kind()],
+            input=UnaryTensorInput(input_names[0]),
+            spec=UnaryElementwiseSpec(ATEN_TO_UNARY_ELEMENTWISE_SPEC[torch_op.kind()]),
             debug_sources=context.debug_sources,
         )
 
@@ -229,39 +235,71 @@ class TorchToIROpConverter(
         input_types = self._inputs_to_torch_types(context, torch_op)
         input_constant_values = self._inputs_constants_to_values(context, torch_op)
 
-        reduce_dimensions = (
+        reduce_dimensions = set(
             input_constant_values[1]
             if input_types[1] == "ListType"
             else [input_constant_values[1]]
         )
 
-        reduction_spec = ReduceSpec(
-            reduce_dimensions=reduce_dimensions,
-            reduction_type=ATEN_TO_REDUCE_SPEC_TYPE[torch_op.kind()],
-        )
-
-        reduction_op = ReduceType(
+        reduction_op = OpType(
             name=out_name if input_constant_values[2] else f"{out_name}_reduction",
-            inputs={"input": input_names[0]},
-            spec=reduction_spec,
+            input=UnaryTensorInput(input_names[0]),
+            spec=ReduceSpec(
+                dimensions=reduce_dimensions,
+                reduction_type=ATEN_TO_REDUCE_SPEC_TYPE[torch_op.kind()],
+            ),
             debug_sources=context.debug_sources,
         )
 
         output = [reduction_op]
 
         if not input_constant_values[2]:
-            squeeze_spec = SqueezeSpec(dimensions=reduce_dimensions)
-
-            squeeze_op = SqueezeType(
+            squeeze_op = OpType(
                 name=out_name,
-                inputs={"input": reduction_op.name},
-                spec=squeeze_spec,
+                input=UnaryTensorInput(reduction_op.name),
+                spec=SqueezeSpec(dimensions=reduce_dimensions),
                 debug_sources=context.debug_sources,
             )
 
             output.append(squeeze_op)
 
         return output, {}
+
+    def _convert_subtract(
+        self, context: ConversionContext, torch_op: torch._C.Node
+    ) -> Tuple[List[OpType], Dict[str, Union[ScalarType, TensorType]]]:
+        out_name = torch_op.output().debugName().replace(".", "_")
+
+        input_names = self._inputs_to_names(context, torch_op)
+        return self._create_subtract(
+            out_name,
+            input_names[0],
+            input_names[1],
+            debug_sources=context.debug_sources,
+        )
+
+    def _convert_divide(
+        self, context: ConversionContext, torch_op: torch._C.Node
+    ) -> Tuple[List[OpType], Dict[str, Union[ScalarType, TensorType]]]:
+        out_name = torch_op.output().debugName().replace(".", "_")
+
+        input_names = self._inputs_to_names(context, torch_op)
+        return self._create_divide(
+            out_name,
+            input_names[0],
+            input_names[1],
+            debug_sources=context.debug_sources,
+        )
+
+    def _convert_abs(
+        self, context: ConversionContext, torch_op: torch._C.Node
+    ) -> Tuple[List[OpType], Dict[str, Union[ScalarType, TensorType]]]:
+        out_name = torch_op.output().debugName().replace(".", "_")
+
+        input_names = self._inputs_to_names(context, torch_op)
+        return self._create_elementwise_abs(
+            out_name, input_names[0], debug_sources=context.debug_sources
+        )
 
     def _convert_relu(
         self, context: ConversionContext, torch_op: torch._C.Node
@@ -307,10 +345,12 @@ class TorchToIROpConverter(
         input_names = self._inputs_to_names(context, torch_op)
         input_constant_values = self._inputs_constants_to_values(context, torch_op)
 
-        permute_op = PermuteType(
+        permute_op = OpType(
             name=out_name,
-            inputs={"input": input_names[0]},
-            spec=PermuteSpec(new_permutation=input_constant_values[1]),
+            input=UnaryTensorInput(input_names[0]),
+            spec=PermuteSpec(
+                permutation={d: p for d, p in enumerate(input_constant_values[1])}
+            ),
             debug_sources=context.debug_sources,
         )
 
@@ -339,12 +379,10 @@ class TorchToIROpConverter(
                     # end - 1 because inclusive indexing
                     index_obj = (begin, end - 1, step)
 
-        index_spec = SliceSpec(index={input_constant_values[1]: index_obj})
-
-        index_op = SliceType(
-            out_name,
-            {"input": input_names[0]},
-            index_spec,
+        index_op = OpType(
+            name=out_name,
+            input=UnaryTensorInput(input_names[0]),
+            spec=SliceSpec(slice={input_constant_values[1]: index_obj}),
             debug_sources=context.debug_sources,
         )
 
@@ -360,23 +398,25 @@ class TorchToIROpConverter(
         input_shape = torch_op.inputsAt(0).type().sizes()
         output_shape = input_constant_values[1]
 
-        spec_list = GroupType.specs_from_reshape(input_shape, output_shape)
+        spec_list = specs_from_reshape(input_shape, output_shape)
 
         out = []
         for s in spec_list[:-1]:
             out.append(
-                GroupType(
+                OpType(
                     f"{out_name}_{s.type}",
-                    inputs={"input": input_names[0]},
+                    input=UnaryTensorInput(input_names[0]),
                     spec=s,
                     debug_sources=context.debug_sources,
                 )
             )
 
         out.append(
-            GroupType(
+            OpType(
                 f"{out_name}",
-                inputs={"input": input_names[0] if len(out) == 0 else out[-1].name},
+                input=UnaryTensorInput(
+                    input_names[0] if len(out) == 0 else out[-1].name
+                ),
                 spec=spec_list[-1],
                 debug_sources=context.debug_sources,
             )
@@ -412,9 +452,9 @@ class TorchToIROpConverter(
             if pad_tup != (0, 0):
                 pad_dict[dim_idx] = pad_tup
 
-        pad_op = PadType(
+        pad_op = OpType(
             name=out_name,
-            inputs={"input": input_names[0]},
+            input=UnaryTensorInput(input_names[0]),
             spec=PadSpec(
                 pad=pad_dict, pad_mode=pad_mode, _ouptut_dims_sidecar=len(input_shape)
             ),
@@ -447,9 +487,9 @@ class TorchToIROpConverter(
                     for i, p in enumerate(padding)
                     if p > 0
                 }
-                pad_op = PadType(
+                pad_op = OpType(
                     name=f"{out_name}_pad",
-                    inputs={"input": input_names[0]},
+                    input=UnaryTensorInput(input_names[0]),
                     spec=PadSpec(
                         pad=pad_dict, pad_mode=0, _ouptut_dims_sidecar=len(input_shape)
                     ),
@@ -480,11 +520,11 @@ class TorchToIROpConverter(
                 out_shape.append(input_shape[-4])
             out_shape.extend([input_shape[-3], out_size(-2), out_size(-1)])
             spec = UnfoldSpec(unfold=unfold_dict, _output_shape_sidecar=out_shape)
-            unfold_op = FoldType(
+            unfold_op = OpType(
                 name=out_name,
-                inputs={
-                    "input": input_names[0] if len(output) == 0 else output[-1].name
-                },
+                input=UnaryTensorInput(
+                    input_names[0] if len(output) == 0 else output[-1].name
+                ),
                 spec=spec,
                 debug_sources=context.debug_sources,
             )
@@ -522,9 +562,9 @@ class TorchToIROpConverter(
                 fold=unfold_dict,
                 _output_shape_sidecar=out_shape,
             )
-            fold_op = FoldType(
+            fold_op = OpType(
                 name=f"{out_name}_fold" if has_padding else out_name,
-                inputs={"input": input_names[0]},
+                input=UnaryTensorInput(input_names[0]),
                 spec=spec,
                 debug_sources=context.debug_sources,
             )
@@ -533,14 +573,14 @@ class TorchToIROpConverter(
 
             if has_padding:
                 index_dict = {
-                    (i + len(input_shape) - 1): (p, -p - 1, 1)
+                    (i + len(input_shape) - 1): (p, -p - 1)
                     for i, p in enumerate(padding)
                     if p > 0
                 }
-                index_op = SliceType(
+                index_op = OpType(
                     name=out_name,
-                    inputs={"input": fold_op.name},
-                    spec=SliceSpec(index=index_dict),
+                    input=UnaryTensorInput(fold_op.name),
+                    spec=SliceSpec(slice=index_dict),
                     debug_sources=context.debug_sources,
                 )
                 output.append(index_op)
@@ -573,9 +613,9 @@ class TorchToIROpConverter(
             case "aten::unsqueeze":
                 squeeze_spec = UnsqueezeSpec(dimensions=[input_constant_values[1]])
 
-        sq_op = SqueezeType(
+        sq_op = OpType(
             name=out_name,
-            inputs={"input": input_names[0]},
+            input=UnaryTensorInput(input_names[0]),
             spec=squeeze_spec,
             debug_sources=context.debug_sources,
         )

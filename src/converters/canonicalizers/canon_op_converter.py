@@ -2,14 +2,14 @@ from typing import Callable, Dict, Generic, List, Tuple, TypeVar, Union
 
 from ...ir.safe_ir import (
     BinaryElementwiseSpec,
-    BinaryElementwiseType,
+    BinaryTensorInput,
     DataType,
     OpType,
     ScalarSpec,
     ScalarType,
     TensorType,
     UnaryElementwiseSpec,
-    UnaryElementwiseType,
+    UnaryTensorInput,
 )
 from ..op_converter import OpConverter
 
@@ -23,33 +23,81 @@ class CanonOpConverter(
     OpConverter[ContextT, ConverterT, InputT, OutputT],
     Generic[ContextT, ConverterT, InputT, OutputT],
 ):
+    def _create_subtract(
+        self, name: str, input_a: str, input_b: str, debug_sources=[], first=True
+    ) -> Tuple[List[OpType], Dict[str, Union[TensorType, ScalarType]]]:
+        neg_b = OpType(
+            name=f"{name}_neg",
+            input=UnaryTensorInput(input_b),
+            spec=UnaryElementwiseSpec(
+                UnaryElementwiseSpec.UnaryElementwiseType.NEGATIVE
+            ),
+            debug_sources=debug_sources,
+        )
+
+        op = OpType(
+            name=f"{name}",
+            input=BinaryTensorInput(input_a, neg_b.name),
+            spec=BinaryElementwiseSpec(BinaryElementwiseSpec.BinaryElementwiseType.ADD),
+            debug_sources=debug_sources,
+        )
+
+        return [neg_b, op], {}
+
+    def _create_divide(
+        self, name: str, input_a: str, input_b: str, debug_sources=[]
+    ) -> Tuple[List[OpType], Dict[str, Union[TensorType, ScalarType]]]:
+        reciprocal_b = OpType(
+            name=f"{name}_reciprocal",
+            input=UnaryTensorInput(input_b),
+            spec=UnaryElementwiseSpec(
+                UnaryElementwiseSpec.UnaryElementwiseType.RECIPROCAL
+            ),
+            debug_sources=debug_sources,
+        )
+
+        op = OpType(
+            name=f"{name}",
+            input=BinaryTensorInput(input_a, reciprocal_b.name),
+            spec=BinaryElementwiseSpec(
+                BinaryElementwiseSpec.BinaryElementwiseType.MULTIPLY
+            ),
+            debug_sources=debug_sources,
+        )
+
+        return [reciprocal_b, op], {}
+
+    def _create_elementwise_abs(
+        self, name: str, input: str, debug_sources=[]
+    ) -> Tuple[List[OpType], Dict[str, Union[TensorType, ScalarType]]]:
+        sign_op = OpType(
+            name=f"{name}_sign",
+            input=UnaryTensorInput(input),
+            spec=UnaryElementwiseSpec(UnaryElementwiseSpec.UnaryElementwiseType.SIGN),
+            debug_sources=debug_sources,
+        )
+
+        op = OpType(
+            name=f"{name}",
+            input=BinaryTensorInput(input, sign_op.name),
+            spec=BinaryElementwiseSpec(
+                BinaryElementwiseSpec.BinaryElementwiseType.MULTIPLY
+            ),
+            debug_sources=debug_sources,
+        )
+
+        return [sign_op, op], {}
+
     def _create_add_one(
         self, name: str, input: str, debug_sources=[]
     ) -> Tuple[List[OpType], Dict[str, Union[TensorType, ScalarType]]]:
         one_name = f"{name}_constant_one"
         one = ScalarType(ScalarSpec(DataType.FLOAT32), data=1)
 
-        op = BinaryElementwiseType(
+        op = OpType(
             name=f"{name}",
-            inputs={"input_0": input, "input_1": one_name},
-            spec=BinaryElementwiseSpec.ADD,
-            debug_sources=debug_sources,
-        )
-
-        return [op], {one_name: one}
-
-    def _create_subtract_one(
-        self, name: str, input: str, debug_sources=[], first=True
-    ) -> Tuple[List[OpType], Dict[str, Union[TensorType, ScalarType]]]:
-        one_name = f"{name}_constant_one"
-        one = ScalarType(ScalarSpec(DataType.FLOAT32), data=1)
-
-        op = BinaryElementwiseType(
-            name=f"{name}",
-            inputs={"input_0": input, "input_1": one_name}
-            if first
-            else {"input_0": one_name, "input_1": input},
-            spec=BinaryElementwiseSpec.SUBTRACT,
+            input=BinaryTensorInput(input, one_name),
+            spec=BinaryElementwiseSpec(BinaryElementwiseSpec.BinaryElementwiseType.ADD),
             debug_sources=debug_sources,
         )
 
@@ -58,44 +106,58 @@ class CanonOpConverter(
     def _create_div_two(
         self, name: str, input: str, debug_sources=[]
     ) -> Tuple[List[OpType], Dict[str, Union[TensorType, ScalarType]]]:
-        two_name = f"{name}_constant_two"
-        two = ScalarType(ScalarSpec(DataType.FLOAT32), data=2)
+        half_name = f"{name}_constant_half"
+        half = ScalarType(ScalarSpec(DataType.FLOAT32), data=0.5)
 
-        div_by_2 = BinaryElementwiseType(
+        div_by_2 = OpType(
             name=f"{name}",
-            inputs={"input_0": input, "input_1": two_name},
-            spec=BinaryElementwiseSpec.DIVIDE,
+            input=BinaryTensorInput(input, half_name),
+            spec=BinaryElementwiseSpec(
+                BinaryElementwiseSpec.BinaryElementwiseType.MULTIPLY
+            ),
             debug_sources=debug_sources,
         )
 
-        return [div_by_2], {two_name: two}
+        return [div_by_2], {half_name: half}
 
     def _create_elementwise_min_max(
         self, name: str, input_a: str, input_b: str, debug_sources=[], min=True
     ) -> Tuple[List[OpType], Dict[str, Union[TensorType, ScalarType]]]:
-        add_op = BinaryElementwiseType(
+        add_op = OpType(
             name=f"{name}_add",
-            inputs={"input_0": input_a, "input_1": input_b},
-            spec=BinaryElementwiseSpec.ADD,
+            input=BinaryTensorInput(input_a, input_b),
+            spec=BinaryElementwiseSpec(BinaryElementwiseSpec.BinaryElementwiseType.ADD),
             debug_sources=debug_sources,
         )
-        sub_op = BinaryElementwiseType(
+        sub_ops, sub_consts = self._create_subtract(
             name=f"{name}_sub",
-            inputs={"input_0": input_a, "input_1": input_b},
-            spec=BinaryElementwiseSpec.SUBTRACT,
-            debug_sources=debug_sources,
-        )
-        abs_op = UnaryElementwiseType(
-            name=f"{name}_abs",
-            inputs={"input": sub_op.name},
-            spec=UnaryElementwiseSpec.ABSOLUTE_VALUE,
+            input_a=input_a,
+            input_b=input_b,
             debug_sources=debug_sources,
         )
 
-        middle_op = BinaryElementwiseType(
+        abs_ops, abs_consts = self._create_elementwise_abs(
+            f"{name}_abs",
+            sub_ops[-1].name,
+            debug_sources=debug_sources,
+        )
+
+        if min:
+            abs_ops.append(
+                OpType(
+                    name=f"{name}_pre_sub_neg_2",
+                    input=UnaryTensorInput(abs_ops[-1].name),
+                    spec=UnaryElementwiseSpec(
+                        UnaryElementwiseSpec.UnaryElementwiseType.NEGATIVE
+                    ),
+                    debug_sources=debug_sources,
+                )
+            )
+
+        middle_op = OpType(
             name=f"{name}_middle_op",
-            inputs={"input_0": add_op.name, "input_1": abs_op.name},
-            spec=BinaryElementwiseSpec.SUBTRACT if min else BinaryElementwiseSpec.ADD,
+            input=BinaryTensorInput(add_op.name, abs_ops[-1].name),
+            spec=BinaryElementwiseSpec(BinaryElementwiseSpec.BinaryElementwiseType.ADD),
             debug_sources=debug_sources,
         )
 
@@ -105,7 +167,9 @@ class CanonOpConverter(
             debug_sources=debug_sources,
         )
 
-        return [add_op, sub_op, abs_op, middle_op] + div_by_two_ops, div_by_2_consts
+        return [add_op] + sub_ops + abs_ops + [
+            middle_op
+        ] + div_by_two_ops, sub_consts | abs_consts | div_by_2_consts
 
     def _create_elementwise_max(
         self, name: str, input_a: str, input_b: str, debug_sources=[]
@@ -124,19 +188,27 @@ class CanonOpConverter(
     def _create_relu(
         self, name: str, input: str, debug_sources=[], flipped=False
     ) -> Tuple[List[OpType], Dict[str, Union[TensorType, ScalarType]]]:
-        abs_op = UnaryElementwiseType(
-            name=f"{name}_abs",
-            inputs={"input": input},
-            spec=UnaryElementwiseSpec.ABSOLUTE_VALUE,
+        abs_ops, abs_consts = self._create_elementwise_abs(
+            f"{name}_abs",
+            input,
             debug_sources=debug_sources,
         )
 
-        middle_op = BinaryElementwiseType(
+        if flipped:
+            abs_ops.append(
+                OpType(
+                    name=f"{name}_pre_middle_op_neg",
+                    input=UnaryTensorInput(abs_ops[-1].name),
+                    spec=UnaryElementwiseSpec(
+                        UnaryElementwiseSpec.UnaryElementwiseType.NEGATIVE
+                    ),
+                    debug_sources=debug_sources,
+                )
+            )
+        middle_op = OpType(
             name=f"{name}_middle_op",
-            inputs={"input_0": input, "input_1": abs_op.name},
-            spec=BinaryElementwiseSpec.SUBTRACT
-            if flipped
-            else BinaryElementwiseSpec.ADD,
+            input=BinaryTensorInput(input, abs_ops[-1].name),
+            spec=BinaryElementwiseSpec(BinaryElementwiseSpec.BinaryElementwiseType.ADD),
             debug_sources=debug_sources,
         )
 
@@ -146,81 +218,100 @@ class CanonOpConverter(
             debug_sources=debug_sources,
         )
 
-        return [abs_op, middle_op] + div_by_two_ops, div_by_2_consts
+        return abs_ops + [middle_op] + div_by_two_ops, abs_consts | div_by_2_consts
 
     def _create_leaky_relu(
-        self, name: str, input: str, negitive_slope: str, debug_sources=[]
+        self, name: str, input: str, negative_slope: str, debug_sources=[]
     ) -> Tuple[List[OpType], Dict[str, Union[TensorType, ScalarType]]]:
         # (1 + negative_slope)/2 * x + (1 -  negative_slope)/2 * torch.abs(x)`
-        add_one_name = f"{name}_add_one"
+
+        # (negative_slope + 1)
         add_one_ops, add_one_consts = self._create_add_one(
-            add_one_name,
-            negitive_slope,
+            f"{name}_add_one",
+            negative_slope,
             debug_sources=debug_sources,
         )
 
-        x_coeff_name = f"{name}_x_coeff"
+        # (negative_slope + 1)/2
         x_coeff_ops, x_coeff_consts = self._create_div_two(
-            x_coeff_name,
-            add_one_name,
+            f"{name}_x_coeff",
+            add_one_ops[-1].name,
             debug_sources=debug_sources,
         )
 
-        x_part = BinaryElementwiseType(
+        # x_part = (1 + negative_slope)/2 * x
+        x_part = OpType(
             name=f"{name}_x_part",
-            inputs={"input_0": x_coeff_name, "input_1": input},
-            spec=BinaryElementwiseSpec.MULTIPLY,
+            input=BinaryTensorInput(x_coeff_ops[-1].name, input),
+            spec=BinaryElementwiseSpec(
+                BinaryElementwiseSpec.BinaryElementwiseType.MULTIPLY
+            ),
             debug_sources=debug_sources,
         )
 
-        sub_one_name = f"{name}_sub_one"
-        sub_one_ops, sub_one_consts = self._create_subtract_one(
-            sub_one_name,
-            negitive_slope,
+        # -negitive_slope
+        positive_slope = OpType(
+            name=f"{name}_positive_slope",
+            input=UnaryTensorInput(negative_slope),
+            spec=UnaryElementwiseSpec(
+                UnaryElementwiseSpec.UnaryElementwiseType.NEGATIVE
+            ),
             debug_sources=debug_sources,
-            first=False,
         )
 
-        x_abs_coeff_name = f"{name}_x_abs_coeff"
+        # -negitive_slope + 1
+        sub_one_ops, sub_one_consts = self._create_add_one(
+            f"{name}_sub_one",
+            positive_slope.name,
+            debug_sources=debug_sources,
+        )
+
+        # (-negitive_slope + 1)/2
         x_abs_coeff_ops, x_abs_coeff_consts = self._create_div_two(
-            x_abs_coeff_name,
-            sub_one_name,
+            f"{name}_x_abs_coeff",
+            sub_one_ops[-1].name,
             debug_sources=debug_sources,
         )
 
-        x_abs = UnaryElementwiseType(
-            name=f"{name}_x_abs",
-            inputs={"input": input},
-            spec=UnaryElementwiseSpec.ABSOLUTE_VALUE,
+        # abs(x)
+        abs_ops, abs_consts = self._create_elementwise_abs(
+            f"{name}_x_abs",
+            input,
             debug_sources=debug_sources,
         )
 
-        x_abs_part = BinaryElementwiseType(
+        # x_abs_part = (-negative_slope + 1)/2 * abs(x)
+        x_abs_part = OpType(
             name=f"{name}_x_abs_part",
-            inputs={"input_0": x_abs_coeff_name, "input_1": x_abs.name},
-            spec=BinaryElementwiseSpec.MULTIPLY,
+            input=BinaryTensorInput(x_abs_coeff_ops[-1].name, abs_ops[-1].name),
+            spec=BinaryElementwiseSpec(
+                BinaryElementwiseSpec.BinaryElementwiseType.MULTIPLY
+            ),
             debug_sources=debug_sources,
         )
 
-        add_op = BinaryElementwiseType(
+        # x_part + x_abs_part
+        add_op = OpType(
             name=f"{name}",
-            inputs={"input_0": x_abs_part.name, "input_1": x_part.name},
-            spec=BinaryElementwiseSpec.ADD,
+            input=BinaryTensorInput(x_part.name, x_abs_part.name),
+            spec=BinaryElementwiseSpec(BinaryElementwiseSpec.BinaryElementwiseType.ADD),
             debug_sources=debug_sources,
         )
 
         return (
-            [
-                x_part,
-                x_abs,
-                x_abs_part,
-                add_op,
-            ]
-            + add_one_ops
-            + sub_one_ops
+            add_one_ops
             + x_coeff_ops
-            + x_abs_coeff_ops,
-            add_one_consts | x_coeff_consts | sub_one_consts | x_abs_coeff_consts,
+            + [x_part]
+            + [positive_slope]
+            + sub_one_ops
+            + x_abs_coeff_ops
+            + abs_ops
+            + [x_abs_part, add_op],
+            add_one_consts
+            | x_coeff_consts
+            | sub_one_consts
+            | x_abs_coeff_consts
+            | abs_consts,
         )
 
     def _create_softplus(
@@ -233,42 +324,43 @@ class CanonOpConverter(
         # n3 = log(n2)
         # n4 = n3 / beta
 
-        mul_op = BinaryElementwiseType(
+        mul_op = OpType(
             name=f"{name}_mul",
-            inputs={"input_0": input, "input_1": beta},
-            spec=BinaryElementwiseSpec.MULTIPLY,
+            input=BinaryTensorInput(input, beta),
+            spec=BinaryElementwiseSpec(
+                BinaryElementwiseSpec.BinaryElementwiseType.MULTIPLY
+            ),
             debug_sources=debug_sources,
         )
 
-        exp_op = UnaryElementwiseType(
+        exp_op = OpType(
             name=f"{name}_exp",
-            inputs={"input": mul_op.name},
-            spec=UnaryElementwiseSpec.EXP,
+            input=UnaryTensorInput(mul_op.name),
+            spec=UnaryElementwiseSpec(UnaryElementwiseSpec.UnaryElementwiseType.EXP),
             debug_sources=debug_sources,
         )
 
-        one_name = f"{name}_constant_one"
-        one = ScalarType(ScalarSpec(DataType.FLOAT32), data=1)
-
-        add_op = BinaryElementwiseType(
-            name=f"{name}_add",
-            inputs={"input_0": exp_op.name, "input_1": one_name},
-            spec=BinaryElementwiseSpec.ADD,
+        add_one_ops, add_one_consts = self._create_add_one(
+            f"{name}_add_one",
+            exp_op.name,
             debug_sources=debug_sources,
         )
 
-        log_op = UnaryElementwiseType(
+        log_op = OpType(
             name=f"{name}_log",
-            inputs={"input": add_op.name},
-            spec=UnaryElementwiseSpec.LOG,
+            input=UnaryTensorInput(add_one_ops[-1].name),
+            spec=UnaryElementwiseSpec(UnaryElementwiseSpec.UnaryElementwiseType.LOG),
             debug_sources=debug_sources,
         )
 
-        div_op = BinaryElementwiseType(
-            name=f"{name}",
-            inputs={"input_0": log_op.name, "input_1": beta},
-            spec=BinaryElementwiseSpec.MULTIPLY,
+        div_ops, div_consts = self._create_divide(
+            name,
+            input_a=log_op.name,
+            input_b=beta,
             debug_sources=debug_sources,
         )
 
-        return [mul_op, exp_op, add_op, log_op, div_op], {one_name: one}
+        return (
+            [mul_op, exp_op] + add_one_ops + [log_op] + div_ops,
+            add_one_consts | div_consts,
+        )

@@ -14,38 +14,37 @@ from ....ir.safe_ir import (
 from ...op_converter import OpConverter
 
 UNARY_ELEMENTWISE_SPEC_TO_ATEN = {
-    str(UnaryElementwiseSpec.ABSOLUTE_VALUE): "aten::abs",
-    str(UnaryElementwiseSpec.NEGATIVE): "aten::neg",
-    str(UnaryElementwiseSpec.SQUARE_ROOT): "aten::sqrt",
-    str(UnaryElementwiseSpec.EXP): "aten::exp",
-    str(UnaryElementwiseSpec.LOG): "aten::log",
-    str(UnaryElementwiseSpec.SIN): "aten::sin",
-    str(UnaryElementwiseSpec.COS): "aten::cos",
-    str(UnaryElementwiseSpec.TAN): "aten::tan",
-    str(UnaryElementwiseSpec.ARCSIN): "aten::asin",
-    str(UnaryElementwiseSpec.ARCCOS): "aten::acos",
-    str(UnaryElementwiseSpec.ARCTAN): "aten::atan",
-    str(UnaryElementwiseSpec.SINH): "aten::sinh",
-    str(UnaryElementwiseSpec.COSH): "aten::cosh",
-    str(UnaryElementwiseSpec.TANH): "aten::tanh",
-    str(UnaryElementwiseSpec.ARCSINH): "aten::asinh",
-    str(UnaryElementwiseSpec.ARCCOSH): "aten::acosh",
-    str(UnaryElementwiseSpec.ARCTANH): "aten::atanh",
+    str(UnaryElementwiseSpec.UnaryElementwiseType.SIGN): "aten::sign",
+    str(UnaryElementwiseSpec.UnaryElementwiseType.NEGATIVE): "aten::neg",
+    str(UnaryElementwiseSpec.UnaryElementwiseType.RECIPROCAL): "aten::reciprocal",
+    str(UnaryElementwiseSpec.UnaryElementwiseType.EXP): "aten::exp",
+    str(UnaryElementwiseSpec.UnaryElementwiseType.LOG): "aten::log",
+    str(UnaryElementwiseSpec.UnaryElementwiseType.SIN): "aten::sin",
+    str(UnaryElementwiseSpec.UnaryElementwiseType.COS): "aten::cos",
+    str(UnaryElementwiseSpec.UnaryElementwiseType.TAN): "aten::tan",
+    str(UnaryElementwiseSpec.UnaryElementwiseType.ARCSIN): "aten::asin",
+    str(UnaryElementwiseSpec.UnaryElementwiseType.ARCCOS): "aten::acos",
+    str(UnaryElementwiseSpec.UnaryElementwiseType.ARCTAN): "aten::atan",
+    str(UnaryElementwiseSpec.UnaryElementwiseType.SINH): "aten::sinh",
+    str(UnaryElementwiseSpec.UnaryElementwiseType.COSH): "aten::cosh",
+    str(UnaryElementwiseSpec.UnaryElementwiseType.TANH): "aten::tanh",
+    str(UnaryElementwiseSpec.UnaryElementwiseType.ARCSINH): "aten::asinh",
+    str(UnaryElementwiseSpec.UnaryElementwiseType.ARCCOSH): "aten::acosh",
+    str(UnaryElementwiseSpec.UnaryElementwiseType.ARCTANH): "aten::atanh",
 }
 
 BINARY_ELEMENTWISE_SPEC_TO_ATEN = {
-    f"binary_{BinaryElementwiseSpec.ADD}": "aten::add",
-    f"binary_{BinaryElementwiseSpec.SUBTRACT}": "aten::sub",
-    f"binary_{BinaryElementwiseSpec.MULTIPLY}": "aten::multiply",
-    f"binary_{BinaryElementwiseSpec.DIVIDE}": "aten::div",
+    f"binary_{BinaryElementwiseSpec.BinaryElementwiseType.ADD}": "aten::add",
+    f"binary_{BinaryElementwiseSpec.BinaryElementwiseType.MULTIPLY}": "aten::mul",
+    f"binary_{BinaryElementwiseSpec.BinaryElementwiseType.EXPONENTIATE}": "aten::pow",
 }
 
 REDUCE_SPEC_TO_ATEN = {
     f"reduce_{ReduceSpec.ReductionType.SUM}": "aten::sum",
+    f"reduce_{ReduceSpec.ReductionType.PRODUCT}": "aten::prod",
+    f"reduce_{ReduceSpec.ReductionType.MAXIMUM}": "aten::amax",
+    f"reduce_{ReduceSpec.ReductionType.MINIMUM}": "aten::amin",
     f"reduce_{ReduceSpec.ReductionType.MEAN}": "aten::mean",
-    f"reduce_{ReduceSpec.ReductionType.MAX}": "aten::amax",
-    f"reduce_{ReduceSpec.ReductionType.MIN}": "aten::amin",
-    f"reduce_{ReduceSpec.ReductionType.PROD}": "aten::prod",
 }
 
 
@@ -79,9 +78,9 @@ class IRToTorchOpConverter(OpConverter[ConversionContext, Callable, OpType, List
         self._converters.update(
             {
                 "permute": self._convert_permute,
-                "index": self._convert_index,
                 "group": self._convert_group,
                 "ungroup": self._convert_group,
+                "slice": self._convert_slice,
                 "pad": self._convert_pad,
                 "fold": self._convert_fold,
                 "unfold": self._convert_fold,
@@ -100,39 +99,37 @@ class IRToTorchOpConverter(OpConverter[ConversionContext, Callable, OpType, List
         return ConversionContext(graph, torch_graph, name_to_output_value)
 
     def _get_operation_key(self, op: OpType) -> str:
-        return op.type
+        return op.spec.type
 
     def _convert_binary_elementwise(
         self, context: ConversionContext, op: OpType
     ) -> List[torch._C.Node]:
-        input_0_val = context.name_to_output_value[op.inputs["input_0"]]
-        input_1_val = context.name_to_output_value[op.inputs["input_1"]]
+        input_0_val = context.name_to_output_value[op.input.input_0]
+        input_1_val = context.name_to_output_value[op.input.input_1]
 
-        match (input_0_val.type().kind(), input_1_val.type().kind(), op.spec):
-            case (_, _, BinaryElementwiseSpec.MULTIPLY):
-                node = context.torch_graph.create("aten::mul")
-            case _:
-                node = context.torch_graph.create(
-                    BINARY_ELEMENTWISE_SPEC_TO_ATEN[op.type]
-                )
+        node = context.torch_graph.create(BINARY_ELEMENTWISE_SPEC_TO_ATEN[op.spec.type])
 
-        match (input_0_val.type().kind(), input_1_val.type().kind(), op.spec):
+        match (input_0_val.type().kind(), input_1_val.type().kind(), op.spec.op_type):
+            case ("TensorType", _, BinaryElementwiseSpec.BinaryElementwiseType.ADD):
+                node.addInput(input_0_val)
+                node.addInput(input_1_val)
+                node.addInput(context.torch_graph.insertConstant(1))
+            case (_, "TensorType", BinaryElementwiseSpec.BinaryElementwiseType.ADD):
+                node.addInput(input_1_val)
+                node.addInput(input_0_val)
+                node.addInput(context.torch_graph.insertConstant(1))
             case (
                 "TensorType",
                 _,
-                BinaryElementwiseSpec.ADD | BinaryElementwiseSpec.SUBTRACT,
+                BinaryElementwiseSpec.BinaryElementwiseType.MULTIPLY,
             ):
                 node.addInput(input_0_val)
                 node.addInput(input_1_val)
-                node.addInput(context.torch_graph.insertConstant(1))
-            case (_, "TensorType", BinaryElementwiseSpec.ADD):
-                node.addInput(input_1_val)
-                node.addInput(input_0_val)
-                node.addInput(context.torch_graph.insertConstant(1))
-            case ("TensorType", _, BinaryElementwiseSpec.MULTIPLY):
-                node.addInput(input_0_val)
-                node.addInput(input_1_val)
-            case (_, "TensorType", BinaryElementwiseSpec.MULTIPLY):
+            case (
+                _,
+                "TensorType",
+                BinaryElementwiseSpec.BinaryElementwiseType.MULTIPLY,
+            ):
                 node.addInput(input_1_val)
                 node.addInput(input_0_val)
             case ("TensorType", "TensorType", _):
@@ -148,15 +145,15 @@ class IRToTorchOpConverter(OpConverter[ConversionContext, Callable, OpType, List
     def _convert_unary_elementwise(
         self, context: ConversionContext, op: OpType
     ) -> List[torch._C.Node]:
-        node = context.torch_graph.create(UNARY_ELEMENTWISE_SPEC_TO_ATEN[op.type])
+        node = context.torch_graph.create(UNARY_ELEMENTWISE_SPEC_TO_ATEN[op.spec.type])
 
-        input_val = context.name_to_output_value[op.inputs["input"]]
+        input_val = context.name_to_output_value[op.input.input]
 
         if input_val.type().kind() != "TensorType":
             # in -> in_tensor
             num_to_tensor_node = context.torch_graph.create("aten::scalar_tensor")
             num_to_tensor_node.addInput(input_val)
-            num_to_tensor_node.addInput(context.torch_graph.insertConstant(2))
+            num_to_tensor_node.addInput(context.torch_graph.insertConstant(6))
             num_to_tensor_node.addInput(context.torch_graph.insertConstant(None))
             num_to_tensor_node.addInput(context.torch_graph.insertConstant(None))
             num_to_tensor_node.addInput(context.torch_graph.insertConstant(None))
@@ -174,22 +171,21 @@ class IRToTorchOpConverter(OpConverter[ConversionContext, Callable, OpType, List
             node.addInput(input_val)
             node.output().setType(torch._C.TensorType.get())
             out = [node]
-
         return out
 
     def _convert_reduce(
         self, context: ConversionContext, op: OpType
     ) -> List[torch._C.Node]:
-        input_val = context.name_to_output_value[op.inputs["input"]]
-        reduction_dims = op.spec.reduce_dimensions
+        input_val = context.name_to_output_value[op.input.input]
+        reduction_dims = op.spec.dimensions
 
         const_true = context.torch_graph.insertConstant(True)
         const_none = context.torch_graph.insertConstant(None)
 
-        if op.type == "reduce_prod":
+        if op.spec.type == "reduce_prod":
             out_nodes = []
             for r in reduction_dims:
-                node = context.torch_graph.create(REDUCE_SPEC_TO_ATEN[op.type])
+                node = context.torch_graph.create(REDUCE_SPEC_TO_ATEN[op.spec.type])
                 node.addInput(input_val)
                 node.addInput(context.torch_graph.insertConstant(r))
                 node.addInput(const_true)
@@ -198,12 +194,12 @@ class IRToTorchOpConverter(OpConverter[ConversionContext, Callable, OpType, List
                 out_nodes.append(node)
             return out_nodes
         else:
-            node = context.torch_graph.create(REDUCE_SPEC_TO_ATEN[op.type])
+            node = context.torch_graph.create(REDUCE_SPEC_TO_ATEN[op.spec.type])
 
             node.addInput(input_val)
-            node.addInput(context.torch_graph.insertConstant(reduction_dims))
+            node.addInput(context.torch_graph.insertConstant(list(reduction_dims)))
             node.addInput(context.torch_graph.insertConstant(True))
-            if op.type in ["reduce_sum", "reduce_mean"]:
+            if op.spec.type in ["reduce_sum", "reduce_mean"]:
                 node.addInput(const_none)  # for some reason sum has an output dtype
 
             return [node]
@@ -213,27 +209,35 @@ class IRToTorchOpConverter(OpConverter[ConversionContext, Callable, OpType, List
     ) -> List[torch._C.Node]:
         node = context.torch_graph.create("aten::permute")
 
-        input_val = context.name_to_output_value[op.inputs["input"]]
+        input_val = context.name_to_output_value[op.input.input]
+
+        max_dim = max(op.spec.permutation.keys())
+        torch_perm = []
+        for d in range(max_dim + 1):
+            if d in op.spec.permutation:
+                torch_perm.append(op.spec.permutation[d])
+            else:
+                torch_perm.append(d)
 
         node.addInput(input_val)
-        node.addInput(context.torch_graph.insertConstant(op.spec.new_permutation))
+        node.addInput(context.torch_graph.insertConstant(torch_perm))
         node.output().setType(torch._C.TensorType.get())
 
         return [node]
 
-    def _convert_index(
+    def _convert_slice(
         self, context: ConversionContext, op: OpType
     ) -> List[torch._C.Node]:
-        sorted_inds = sorted(op.spec.index.keys())
+        sorted_inds = sorted(op.spec.slice.keys())
 
-        input_val = context.name_to_output_value[op.inputs["input"]]
+        input_val = context.name_to_output_value[op.input.input]
 
         num_removed = 0
         nodes = []
 
         last_inp = input_val
         for i in sorted_inds:
-            curr_val = op.spec.index[i]
+            curr_val = op.spec.slice[i]
             if isinstance(curr_val, tuple):
                 node = context.torch_graph.create("aten::slice")
 
@@ -247,7 +251,7 @@ class IRToTorchOpConverter(OpConverter[ConversionContext, Callable, OpType, List
                     )
                 else:
                     node.addInput(context.torch_graph.insertConstant(curr_val[1] + 1))
-                node.addInput(context.torch_graph.insertConstant(curr_val[2]))
+                node.addInput(context.torch_graph.insertConstant(1))
             else:
                 node = context.torch_graph.create("aten::select")
 
@@ -267,7 +271,7 @@ class IRToTorchOpConverter(OpConverter[ConversionContext, Callable, OpType, List
     def _convert_group(
         self, context: ConversionContext, op: OpType
     ) -> List[torch._C.Node]:
-        input_val = context.name_to_output_value[op.inputs["input"]]
+        input_val = context.name_to_output_value[op.input.input]
         node = context.torch_graph.create("aten::reshape")
         node.addInput(input_val)
         node.addInput(context.torch_graph.insertConstant(op.spec._output_shape_sidecar))
@@ -276,7 +280,7 @@ class IRToTorchOpConverter(OpConverter[ConversionContext, Callable, OpType, List
     def _convert_pad(
         self, context: ConversionContext, op: OpType
     ) -> List[torch._C.Node]:
-        input_val = context.name_to_output_value[op.inputs["input"]]
+        input_val = context.name_to_output_value[op.input.input]
         node = context.torch_graph.create("aten::pad")
         node.addInput(input_val)
 
@@ -307,7 +311,7 @@ class IRToTorchOpConverter(OpConverter[ConversionContext, Callable, OpType, List
     def _convert_fold(
         self, context: ConversionContext, op: OpType
     ) -> List[torch._C.Node]:
-        input_val = context.name_to_output_value[op.inputs["input"]]
+        input_val = context.name_to_output_value[op.input.input]
 
         # fold and unfold can only really work on 3D or 4D tensors in torch
         match op.spec.type:
@@ -349,14 +353,16 @@ class IRToTorchOpConverter(OpConverter[ConversionContext, Callable, OpType, List
     def _convert_squeeze(
         self, context: ConversionContext, op: OpType
     ) -> List[torch._C.Node]:
-        input_val = context.name_to_output_value[op.inputs["input"]]
+        input_val = context.name_to_output_value[op.input.input]
 
         output = []
         match op.spec.type:
             case "squeeze":
                 node = context.torch_graph.create("aten::squeeze")
                 node.addInput(input_val)
-                node.addInput(context.torch_graph.insertConstant(op.spec.dimensions))
+                node.addInput(
+                    context.torch_graph.insertConstant(list(op.spec.dimensions))
+                )
                 output.append(node)
             case "unsqueeze":
                 last_node = input_val

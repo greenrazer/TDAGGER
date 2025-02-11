@@ -81,7 +81,7 @@
     - neg, inverse
     - exp, log, sin, arcsin, cos, arccos, tan, arctan, sinh, arcsinh, cosh, arccosh, tanh, arctanh, gaussian, inv_gaussian
 - binary ops
-  - add, subtract, multiply, divide, pow, root
+  - add, multiply, exponentiate
 - sign
 
 The nice thing about all these ops is that they all have inverses or pseudo inverses

@@ -188,7 +188,7 @@ class TorchReifier(Reifier):
 
     def _all_inputs_processed(self, op):
         return all(
-            [input_name in self.processed_ops for input_name in op.unique_indices]
+            [input_name in self.processed_ops for input_name in op.input.unique_indices]
         )
 
     def export(self) -> torch.nn.Module:
