@@ -11,7 +11,6 @@ from ....ir.safe_ir import (
     DataType,
     FoldSpec,
     GroupSpec,
-    InterleaveSpec,
     OpInput,
     OpSpec,
     OpType,
@@ -24,7 +23,6 @@ from ....ir.safe_ir import (
     SliceSpec,
     SpecType,
     SqueezeSpec,
-    StrideSpec,
     TensorSpec,
     TensorType,
     UnaryElementwiseSpec,
@@ -32,6 +30,7 @@ from ....ir.safe_ir import (
     UnfoldSpec,
     UngroupSpec,
     UnsqueezeSpec,
+    SelectSpec
 )
 from ..canon_op_converter import CanonOpConverter
 from .group_helpers import specs_from_reshape
@@ -110,8 +109,8 @@ class TorchToIROpConverter(
                 "aten::leaky_relu": self._convert_leaky_relu,
                 "aten::softplus": self._convert_softplus,
                 "aten::permute": self._convert_permute,
-                "aten::slice": self._convert_index,
-                "aten::select": self._convert_index,
+                "aten::slice": self._convert_slice,
+                "aten::select": self._convert_select,
                 "aten::reshape": self._convert_reshape,
                 "aten::pad": self._convert_pad,
                 "aten::im2col": self._convert_fold,
@@ -357,7 +356,7 @@ class TorchToIROpConverter(
 
         return [permute_op], {}
 
-    def _convert_index(
+    def _convert_slice(
         self, context: ConversionContext, torch_op: torch._C.Node
     ) -> Tuple[List[OpType], Dict[str, Union[ScalarType, TensorType]]]:
         out_name = torch_op.output().debugName().replace(".", "_")
@@ -365,43 +364,105 @@ class TorchToIROpConverter(
         input_names = self._inputs_to_names(context, torch_op)
         input_constant_values = self._inputs_constants_to_values(context, torch_op)
 
-        if torch_op.kind() == "aten::select":
-            index_obj = input_constant_values[2]
-        elif torch_op.kind() == "aten::slice":
-            # step can never be negitive in pytorch slices
-            match (
-                input_constant_values[2],
-                input_constant_values[3],
-            ):
-                case (begin, 9223372036854775807):
-                    index_obj = (begin, -1)
-                case (begin, end):
-                    # end - 1 because inclusive indexing
-                    index_obj = (begin, end - 1)
+        # step can never be negitive in pytorch slices
+        match (
+            input_constant_values[2],
+            input_constant_values[3],
+        ):
+            case (begin, 9223372036854775807):
+                index_obj = (begin, -1)
+            case (begin, end):
+                # end - 1 because inclusive indexing
+                index_obj = (begin, end - 1)
 
-        index_op = OpType(
+        slice_op = OpType(
             name=f"{out_name}_slice"
-            if torch_op.kind() == "aten::slice" and input_constant_values[4] != 1
+            if input_constant_values[4] != 1
             else out_name,
             input=UnaryTensorInput(input_names[0]),
             spec=SliceSpec(slice={input_constant_values[1]: index_obj}),
             debug_sources=context.debug_sources,
         )
 
-        out = [index_op]
+        out = [slice_op]
 
-        if torch_op.kind() == "aten::slice" and input_constant_values[4] != 1:
-            stride_op = OpType(
-                name=out_name,
-                input=UnaryTensorInput(index_op.name),
-                spec=StrideSpec(
-                    stride={input_constant_values[1]: input_constant_values[4]}
+        if input_constant_values[4] != 1:
+            input_shape = torch_op.inputsAt(0).type().sizes()
+
+            after_pad_amount = (-input_shape[input_constant_values[1]]) % input_constant_values[4]
+
+            pad_op = OpType(
+                name=f"{out_name}_pad",
+                input=UnaryTensorInput(slice_op.name),
+                spec=PadSpec(
+                    pad={input_constant_values[1]: (0, after_pad_amount)},
+                    pad_mode=0,
+                    _output_dims_sidecar=len(input_shape)
+                    ),
+                debug_sources=context.debug_sources,
+            )
+            out.append(pad_op)
+
+            ungroup_output_shape = input_shape.copy()
+            ungroup_output_shape[input_constant_values[1]:input_constant_values[1]+1] = [math.ceil(ungroup_output_shape[input_constant_values[1]]/input_constant_values[4]), input_constant_values[4]]
+            ungroup_op = OpType(
+                name=f"{out_name}_ungroup",
+                input=UnaryTensorInput(pad_op.name),
+                spec=UngroupSpec(
+                    ungroups={input_constant_values[1]: [-1, input_constant_values[4]]},
+                    _output_shape_sidecar=ungroup_output_shape
                 ),
                 debug_sources=context.debug_sources,
             )
-            out.append(stride_op)
+            out.append(ungroup_op)
 
+            select_op = OpType(
+                name=f"{out_name}_select",
+                input=UnaryTensorInput(ungroup_op.name),
+                spec=SelectSpec(
+                    select={input_constant_values[1]+1: 0}
+                ),
+                debug_sources=context.debug_sources,
+            )
+            out.append(select_op)
+
+            group_output_shape = input_shape.copy()
+            group_output_shape[input_constant_values[1]] = math.ceil(group_output_shape[input_constant_values[1]]/input_constant_values[4])
+            group_op = OpType(
+                name=out_name,
+                input=UnaryTensorInput(select_op.name),
+                spec=GroupSpec(
+                    groups=[[input_constant_values[1],input_constant_values[1]+1]],
+                    _output_shape_sidecar=group_output_shape
+                ),
+                debug_sources=context.debug_sources,
+            )
+            out.append(group_op)
         return out, {}
+    
+    def _convert_select(
+        self, context: ConversionContext, torch_op: torch._C.Node
+    ) -> Tuple[List[OpType], Dict[str, Union[ScalarType, TensorType]]]:
+        out_name = torch_op.output().debugName().replace(".", "_")
+
+        input_names = self._inputs_to_names(context, torch_op)
+        input_constant_values = self._inputs_constants_to_values(context, torch_op)
+
+        select_op = OpType(
+            name=f"{out_name}_select",
+            input=UnaryTensorInput(input_names[0]),
+            spec=SelectSpec(select={input_constant_values[1]: input_constant_values[2]}),
+            debug_sources=context.debug_sources,
+        )
+
+        squeeze_op = OpType(
+            name=f"{out_name}",
+            input=UnaryTensorInput(select_op.name),
+            spec=SqueezeSpec(dimensions={input_constant_values[1]}),
+            debug_sources=context.debug_sources,
+        )
+
+        return [select_op, squeeze_op], {}
 
     def _convert_reshape(
         self, context: ConversionContext, torch_op: torch._C.Node
@@ -471,7 +532,7 @@ class TorchToIROpConverter(
             name=out_name,
             input=UnaryTensorInput(input_names[0]),
             spec=PadSpec(
-                pad=pad_dict, pad_mode=pad_mode, _ouptut_dims_sidecar=len(input_shape)
+                pad=pad_dict, pad_mode=pad_mode, _output_dims_sidecar=len(input_shape)
             ),
             debug_sources=context.debug_sources,
         )
@@ -506,7 +567,7 @@ class TorchToIROpConverter(
                     name=f"{out_name}_pad",
                     input=UnaryTensorInput(input_names[0]),
                     spec=PadSpec(
-                        pad=pad_dict, pad_mode=0, _ouptut_dims_sidecar=len(input_shape)
+                        pad=pad_dict, pad_mode=0, _output_dims_sidecar=len(input_shape)
                     ),
                     debug_sources=context.debug_sources,
                 )

@@ -8,7 +8,7 @@ from .op_spec import OpSpec
 
 
 @dataclass
-class SqueezeSpec:
+class SqueezeSpec(OpSpec):
     dimensions: Set[int]
 
     @property

@@ -8,7 +8,7 @@ from .op_spec import OpSpec
 
 
 @dataclass
-class RepeatSpec:
+class RepeatSpec(OpSpec):
     repeat: Dict[int, int]  # dim -> num_repeats
 
     # TODO: remove and propagate shape through network

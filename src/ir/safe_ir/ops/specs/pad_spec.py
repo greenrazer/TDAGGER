@@ -41,7 +41,7 @@ class PadSpec(OpSpec):
     pad_mode: Union[Any, PadMode]
 
     # TODO: remove and propagate dims through network
-    _ouptut_dims_sidecar: int
+    _output_dims_sidecar: int
 
     @property
     def type(self) -> str:

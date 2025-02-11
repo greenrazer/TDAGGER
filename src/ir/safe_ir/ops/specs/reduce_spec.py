@@ -8,7 +8,7 @@ from .op_spec import OpSpec
 
 
 @dataclass
-class ReduceSpec:
+class ReduceSpec(OpSpec):
     class ReductionType(Enum):
         SUM = auto()
         PRODUCT = auto()

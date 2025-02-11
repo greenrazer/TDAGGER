@@ -82,7 +82,7 @@ class IRToTorchOpConverter(OpConverter[ConversionContext, Callable, OpType, List
                 "ungroup": self._convert_group,
                 "slice": self._convert_slice,
                 "pad": self._convert_pad,
-                "stride": self._convert_stride,
+                "select": self._convert_select,
                 "fold": self._convert_fold,
                 "unfold": self._convert_fold,
                 "squeeze": self._convert_squeeze,
@@ -235,34 +235,25 @@ class IRToTorchOpConverter(OpConverter[ConversionContext, Callable, OpType, List
 
         input_val = context.name_to_output_value[op.input.input]
 
-        num_removed = 0
         nodes = []
 
         last_inp = input_val
         for i in sorted_inds:
             curr_val = op.spec.slice[i]
-            if isinstance(curr_val, tuple):
-                node = context.torch_graph.create("aten::slice")
 
-                node.addInput(last_inp)
-                node.addInput(context.torch_graph.insertConstant(i - num_removed))
-                node.addInput(context.torch_graph.insertConstant(curr_val[0]))
-                # from inclusive to exclusive end
-                if curr_val[1] == -1:  # if to end of list replace with 2^63 - 1
-                    node.addInput(
-                        context.torch_graph.insertConstant(9223372036854775807)
-                    )
-                else:
-                    node.addInput(context.torch_graph.insertConstant(curr_val[1] + 1))
-                node.addInput(context.torch_graph.insertConstant(1))
+            node = context.torch_graph.create("aten::slice")
+
+            node.addInput(last_inp)
+            node.addInput(context.torch_graph.insertConstant(i))
+            node.addInput(context.torch_graph.insertConstant(curr_val[0]))
+            # from inclusive to exclusive end
+            if curr_val[1] == -1:  # if to end of list replace with 2^63 - 1
+                node.addInput(
+                    context.torch_graph.insertConstant(9223372036854775807)
+                )
             else:
-                node = context.torch_graph.create("aten::select")
-
-                node.addInput(last_inp)
-                node.addInput(context.torch_graph.insertConstant(i - num_removed))
-                node.addInput(context.torch_graph.insertConstant(curr_val))
-
-                num_removed += 1
+                node.addInput(context.torch_graph.insertConstant(curr_val[1] + 1))
+            node.addInput(context.torch_graph.insertConstant(1))
 
             node.output().setType(torch._C.TensorType.get())
 
@@ -271,31 +262,35 @@ class IRToTorchOpConverter(OpConverter[ConversionContext, Callable, OpType, List
 
         return nodes
 
-    def _convert_stride(
+    def _convert_select(
         self, context: ConversionContext, op: OpType
     ) -> List[torch._C.Node]:
-        sorted_inds = sorted(op.spec.stride.keys())
+        sorted_inds = sorted(op.spec.select.keys())
 
         input_val = context.name_to_output_value[op.input.input]
 
-        num_removed = 0
         nodes = []
 
         last_inp = input_val
         for i in sorted_inds:
-            curr_val = op.spec.stride[i]
-            node = context.torch_graph.create("aten::slice")
+            index = op.spec.select[i]
+            select_node = context.torch_graph.create("aten::select")
 
-            node.addInput(last_inp)
-            node.addInput(context.torch_graph.insertConstant(i - num_removed))
-            node.addInput(context.torch_graph.insertConstant(0))
-            node.addInput(context.torch_graph.insertConstant(9223372036854775807)) # 2^63 - 1
-            node.addInput(context.torch_graph.insertConstant(curr_val))
+            select_node.addInput(last_inp)
+            select_node.addInput(context.torch_graph.insertConstant(i))
+            select_node.addInput(context.torch_graph.insertConstant(index))
+            select_node.output().setType(torch._C.TensorType.get())
 
-            node.output().setType(torch._C.TensorType.get())
+            nodes.append(select_node)
 
-            nodes.append(node)
-            last_inp = node.output()
+            unsqueeze_node = context.torch_graph.create("aten::unsqueeze")
+            unsqueeze_node.addInput(select_node.output())
+            unsqueeze_node.addInput(context.torch_graph.insertConstant(i))
+            unsqueeze_node.output().setType(torch._C.TensorType.get())
+
+            nodes.append(unsqueeze_node)
+
+            last_inp = unsqueeze_node.output()
 
         return nodes
     
@@ -318,7 +313,7 @@ class IRToTorchOpConverter(OpConverter[ConversionContext, Callable, OpType, List
         # padding is stored in reverse last dim -> first dim
         pad_arr = []
         for i in range(
-            op.spec._ouptut_dims_sidecar - 1, min(op.spec.pad.keys()) - 1, -1
+            op.spec._output_dims_sidecar - 1, min(op.spec.pad.keys()) - 1, -1
         ):
             if i in op.spec.pad:
                 pad_arr.extend(list(op.spec.pad[i]))

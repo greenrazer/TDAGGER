@@ -6,22 +6,19 @@ import torch.nn as nn
 from src.safe_dag import SafeDAG
 
 
-class Slice(nn.Module):
+class Select(nn.Module):
     def __init__(self):
         super().__init__()
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        x = x[:, 2:-2, 1:, :, :, :, :3]
-        x = x[:, 2:-2, 1:, :, :, :, 1:]
-        x = x[:, 1:15, 2:20, :, :, :, :]
-        x = x[..., 1:2, :2]
-        x = x[1:2, ...]
+        x = x[0, :, 1, ...]
+        x = x[..., 0]
         return x
 
 
-class TestTorchSlice(unittest.TestCase):
+class TestTorchSelect(unittest.TestCase):
     def setUp(self):
-        self.model = Slice()
+        self.model = Select()
         self.example_input = torch.rand((8, 32, 32, 4, 5, 6, 7))
 
         self.traced_model = torch.jit.trace(self.model, self.example_input)

@@ -186,7 +186,7 @@ class CanonOpConverter(
         )
 
     def _create_relu(
-        self, name: str, input: str, debug_sources=[], flipped=False
+        self, name: str, input: str, debug_sources=[]
     ) -> Tuple[List[OpType], Dict[str, Union[TensorType, ScalarType]]]:
         abs_ops, abs_consts = self._create_elementwise_abs(
             f"{name}_abs",
@@ -194,17 +194,6 @@ class CanonOpConverter(
             debug_sources=debug_sources,
         )
 
-        if flipped:
-            abs_ops.append(
-                OpType(
-                    name=f"{name}_pre_middle_op_neg",
-                    input=UnaryTensorInput(abs_ops[-1].name),
-                    spec=UnaryElementwiseSpec(
-                        UnaryElementwiseSpec.UnaryElementwiseType.NEGATIVE
-                    ),
-                    debug_sources=debug_sources,
-                )
-            )
         middle_op = OpType(
             name=f"{name}_middle_op",
             input=BinaryTensorInput(input, abs_ops[-1].name),

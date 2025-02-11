@@ -13,7 +13,7 @@ class Stride(nn.Module):
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         x = x[:, ::2, ::4, :, :, :, ::3]
         x = x[::4, :, :, ::5, :, ::6, :]
-        x = x[:, :, :, :, ::3, :, :]
+        x = x[..., ::3, :, :]
         return x
 
 
