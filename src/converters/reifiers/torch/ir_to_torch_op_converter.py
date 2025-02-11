@@ -82,10 +82,12 @@ class IRToTorchOpConverter(OpConverter[ConversionContext, Callable, OpType, List
                 "ungroup": self._convert_group,
                 "slice": self._convert_slice,
                 "pad": self._convert_pad,
+                "stride": self._convert_stride,
                 "fold": self._convert_fold,
                 "unfold": self._convert_fold,
                 "squeeze": self._convert_squeeze,
                 "unsqueeze": self._convert_squeeze,
+                "repeat": self._convert_repeat
             }
         )
 
@@ -153,7 +155,8 @@ class IRToTorchOpConverter(OpConverter[ConversionContext, Callable, OpType, List
             # in -> in_tensor
             num_to_tensor_node = context.torch_graph.create("aten::scalar_tensor")
             num_to_tensor_node.addInput(input_val)
-            num_to_tensor_node.addInput(context.torch_graph.insertConstant(6))
+            # look at https://github.com/pytorch/pytorch/blob/main/c10/core/ScalarType.h
+            num_to_tensor_node.addInput(context.torch_graph.insertConstant(6)) # 6 = float32
             num_to_tensor_node.addInput(context.torch_graph.insertConstant(None))
             num_to_tensor_node.addInput(context.torch_graph.insertConstant(None))
             num_to_tensor_node.addInput(context.torch_graph.insertConstant(None))
@@ -268,6 +271,34 @@ class IRToTorchOpConverter(OpConverter[ConversionContext, Callable, OpType, List
 
         return nodes
 
+    def _convert_stride(
+        self, context: ConversionContext, op: OpType
+    ) -> List[torch._C.Node]:
+        sorted_inds = sorted(op.spec.stride.keys())
+
+        input_val = context.name_to_output_value[op.input.input]
+
+        num_removed = 0
+        nodes = []
+
+        last_inp = input_val
+        for i in sorted_inds:
+            curr_val = op.spec.stride[i]
+            node = context.torch_graph.create("aten::slice")
+
+            node.addInput(last_inp)
+            node.addInput(context.torch_graph.insertConstant(i - num_removed))
+            node.addInput(context.torch_graph.insertConstant(0))
+            node.addInput(context.torch_graph.insertConstant(9223372036854775807)) # 2^63 - 1
+            node.addInput(context.torch_graph.insertConstant(curr_val))
+
+            node.output().setType(torch._C.TensorType.get())
+
+            nodes.append(node)
+            last_inp = node.output()
+
+        return nodes
+    
     def _convert_group(
         self, context: ConversionContext, op: OpType
     ) -> List[torch._C.Node]:
@@ -381,3 +412,24 @@ class IRToTorchOpConverter(OpConverter[ConversionContext, Callable, OpType, List
             case _:
                 raise Exception(f"Squeeze type Unknown: {op.spec.type}")
         return output
+
+    def _convert_repeat(
+        self, context: ConversionContext, op: OpType
+    ) -> List[torch._C.Node]:
+        input_val = context.name_to_output_value[op.input.input]
+    
+        node = context.torch_graph.create("aten::repeat")
+
+        repeat_list = []
+        for d in range(op.spec._output_dims_sidecar):
+            if d in op.spec.repeat:
+                repeat_list.append(op.spec.repeat[d])
+            else:
+                repeat_list.append(1)
+
+        node.addInput(input_val)
+        node.addInput(
+            context.torch_graph.insertConstant(repeat_list)
+        )
+
+        return [node]

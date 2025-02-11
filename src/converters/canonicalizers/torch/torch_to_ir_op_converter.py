@@ -118,6 +118,7 @@ class TorchToIROpConverter(
                 "aten::col2im": self._convert_fold,
                 "aten::squeeze": self._convert_squeeze,
                 "aten::unsqueeze": self._convert_squeeze,
+                "aten::repeat": self._convert_repeat,
             }
         )
 
@@ -371,22 +372,36 @@ class TorchToIROpConverter(
             match (
                 input_constant_values[2],
                 input_constant_values[3],
-                input_constant_values[4],
             ):
-                case (begin, 9223372036854775807, step):
-                    index_obj = (begin, -1, step)
-                case (begin, end, step):
+                case (begin, 9223372036854775807):
+                    index_obj = (begin, -1)
+                case (begin, end):
                     # end - 1 because inclusive indexing
-                    index_obj = (begin, end - 1, step)
+                    index_obj = (begin, end - 1)
 
         index_op = OpType(
-            name=out_name,
+            name=f"{out_name}_slice"
+            if torch_op.kind() == "aten::slice" and input_constant_values[4] != 1
+            else out_name,
             input=UnaryTensorInput(input_names[0]),
             spec=SliceSpec(slice={input_constant_values[1]: index_obj}),
             debug_sources=context.debug_sources,
         )
 
-        return [index_op], {}
+        out = [index_op]
+
+        if torch_op.kind() == "aten::slice" and input_constant_values[4] != 1:
+            stride_op = OpType(
+                name=out_name,
+                input=UnaryTensorInput(index_op.name),
+                spec=StrideSpec(
+                    stride={input_constant_values[1]: input_constant_values[4]}
+                ),
+                debug_sources=context.debug_sources,
+            )
+            out.append(stride_op)
+
+        return out, {}
 
     def _convert_reshape(
         self, context: ConversionContext, torch_op: torch._C.Node
@@ -621,3 +636,79 @@ class TorchToIROpConverter(
         )
 
         return [sq_op], {}
+
+    def _convert_repeat(
+        self, context: ConversionContext, torch_op: torch._C.Node
+    ) -> Tuple[List[OpType], Dict[str, Union[ScalarType, TensorType]]]:
+        out_name = torch_op.output().debugName().replace(".", "_")
+
+        input_names = self._inputs_to_names(context, torch_op)
+        input_constant_values = self._inputs_constants_to_values(context, torch_op)
+        input_shape = torch_op.inputsAt(0).type().sizes()
+        repeats = input_constant_values[1]
+
+        # easy
+        if len(input_shape) == len(repeats):
+            if not any([s > 1 and r > 1 for s,r in zip(input_shape, repeats)]):
+                op = OpType(
+                    name=out_name,
+                    input=UnaryTensorInput(input_names[0]),
+                    spec=RepeatSpec(
+                        repeat={i: r for i, r in enumerate(repeats) if r > 1}
+                    ),
+                    debug_sources=context.debug_sources,
+                )
+                return [op], {}
+            else:  
+                ungroup_dict = {}
+                _ungroup_output_shape_sidecar = []
+                repeat_dict ={}
+                groups = []
+                _group_output_shape_sidecar = []
+                
+                repeated_inds = 0
+                for d, (s,r) in enumerate(zip(input_shape, repeats)):
+                    if r > 1:
+                        ungroup_dict[d] = [1, -1]
+                        _ungroup_output_shape_sidecar.extend([1, s])
+                        repeat_dict[d + repeated_inds] = r
+                        groups.append([d + repeated_inds, d + repeated_inds + 1])
+                        _group_output_shape_sidecar.append(r*s)
+                        repeated_inds += 1
+                    else:
+                        _ungroup_output_shape_sidecar.append(s)
+                        _group_output_shape_sidecar.append(s)
+
+                ungroup_op = OpType(
+                    name=f"{out_name}_ungroup",
+                    input=UnaryTensorInput(input_names[0]),
+                    spec=UngroupSpec(
+                        ungroups=ungroup_dict,
+                        _output_shape_sidecar=_ungroup_output_shape_sidecar
+                    ),
+                    debug_sources=context.debug_sources,
+                )
+            
+                repeat_op = OpType(
+                    name=f"{out_name}_repeat",
+                    input=UnaryTensorInput(ungroup_op.name),
+                    spec=RepeatSpec(
+                        repeat=repeat_dict,
+                        _output_dims_sidecar=len(_ungroup_output_shape_sidecar)
+                    ),
+                    debug_sources=context.debug_sources,
+                )
+
+                group_op = OpType(
+                    name=f"{out_name}",
+                    input=UnaryTensorInput(repeat_op.name),
+                    spec=GroupSpec(
+                        groups=groups,
+                        _output_shape_sidecar=_group_output_shape_sidecar
+                    ),
+                    debug_sources=context.debug_sources,
+                )
+
+                return [ungroup_op, repeat_op, group_op], {}   
+        else:
+            raise NotImplementedError("cannot repeat with extra dimensions yet")
