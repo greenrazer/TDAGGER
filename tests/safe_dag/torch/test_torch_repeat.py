@@ -13,7 +13,9 @@ class Repeat(nn.Module):
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         x = x.repeat(1,1,1,1,1,1,2)
         x = x.repeat(1,2,1,1,1,1,1)
-        # x = x.repeat(2,1,1,1,1,1,1,1)
+        x = x.repeat(2,1,1,1,1,1,1,1)
+        x = x.repeat(1,1,1,1,1,1,1,1,1,1,1)
+        x = x.repeat(1,1,1,1,1,1,1,1,1,1,1,1,1)
         return x
 
 
