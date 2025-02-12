@@ -7,7 +7,6 @@
 
 - It is hard to tell things about models automatically, like total_flops, memory_reads, memory_writes
 - It is hard to remove batch dimensions from models when needed.
-- Neural Network formats are all quite difficult to translate between (.pt, .tflite, .onnx, ...) because of different ops and implementations.
 
 ## Goal
 

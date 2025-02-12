@@ -1,10 +1,12 @@
 from dataclasses import dataclass
 from enum import Enum, auto
-from typing import Type
+from typing import List, Type
 
 from ..inputs.binary_tensor_input import BinaryTensorInput
 from ..inputs.op_input import OpInput
 from .op_spec import OpSpec
+from ...safe_ir import SpecType, TensorSpec, ScalarSpec
+from ....compute_stats import ComputeStats
 
 
 @dataclass
@@ -12,7 +14,6 @@ class BinaryElementwiseSpec(OpSpec):
     class BinaryElementwiseType(Enum):
         ADD = auto()
         MULTIPLY = auto()
-        EXPONENTIATE = auto()
 
         def to_infix(self) -> str:
             match self:
@@ -20,8 +21,6 @@ class BinaryElementwiseSpec(OpSpec):
                     return "+"
                 case self.MULTIPLY:
                     return "*"
-                case self.EXPONENTIATE:
-                    return "^"
 
         def __str__(self):
             match self:
@@ -29,8 +28,6 @@ class BinaryElementwiseSpec(OpSpec):
                     return "add"
                 case BinaryElementwiseSpec.BinaryElementwiseType.MULTIPLY:
                     return "multiply"
-                case BinaryElementwiseSpec.BinaryElementwiseType.EXPONENTIATE:
-                    return "exponentiate"
 
     op_type: BinaryElementwiseType
 
@@ -44,3 +41,34 @@ class BinaryElementwiseSpec(OpSpec):
 
     def format_input(self, input: BinaryTensorInput) -> str:
         return f"%{input.input_0} {self.op_type.to_infix()} %{input.input_1}"
+    
+    def output_spec(self, inputs: List[SpecType]) -> SpecType:
+        if isinstance(inputs[0], TensorSpec) and isinstance(inputs[1], TensorSpec):
+            if inputs[0].shape != inputs[1].shape:
+                raise Exception(f"All input shapes must be the same: {inputs[0].shape} != {inputs[1].shape}")
+            return inputs[0]
+        
+        if isinstance(inputs[1], TensorSpec):
+            return inputs[1]
+        
+        return inputs[0]
+
+    def compute_stats(self, inputs: List[SpecType]) -> ComputeStats:
+        # these should be the same
+        input_0_size = inputs[0].size()
+        input_1_size = inputs[1].size()
+        output_size = self.output_spec(inputs).size()
+        match self.op_type:
+            case BinaryElementwiseSpec.BinaryElementwiseType.ADD:
+                return ComputeStats(
+                    flops=output_size, # one addition per element pair
+                    reads=input_0_size + input_1_size, # one read from each tensor
+                    writes=output_size # one write to the output tensor
+                )
+            case BinaryElementwiseSpec.BinaryElementwiseType.MULTIPLY:
+                return ComputeStats(
+                    flops=output_size, # one multiplication per element pair
+                    reads=input_0_size + input_1_size, # one read from each tensor
+                    writes=output_size # one write to the output tensor
+                )
+

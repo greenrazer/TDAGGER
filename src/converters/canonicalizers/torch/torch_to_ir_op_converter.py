@@ -58,7 +58,6 @@ ATEN_TO_UNARY_ELEMENTWISE_SPEC = {
 ATEN_TO_BINARY_ELEMENTWISE_SPEC = {
     "aten::add": BinaryElementwiseSpec.BinaryElementwiseType.ADD,
     "aten::mul": BinaryElementwiseSpec.BinaryElementwiseType.MULTIPLY,
-    "aten::pow": BinaryElementwiseSpec.BinaryElementwiseType.EXPONENTIATE,
 }
 
 ATEN_TO_REDUCE_SPEC_TYPE = {

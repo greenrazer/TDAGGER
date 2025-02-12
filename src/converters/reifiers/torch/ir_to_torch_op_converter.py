@@ -35,8 +35,7 @@ UNARY_ELEMENTWISE_SPEC_TO_ATEN = {
 
 BINARY_ELEMENTWISE_SPEC_TO_ATEN = {
     f"binary_{BinaryElementwiseSpec.BinaryElementwiseType.ADD}": "aten::add",
-    f"binary_{BinaryElementwiseSpec.BinaryElementwiseType.MULTIPLY}": "aten::mul",
-    f"binary_{BinaryElementwiseSpec.BinaryElementwiseType.EXPONENTIATE}": "aten::pow",
+    f"binary_{BinaryElementwiseSpec.BinaryElementwiseType.MULTIPLY}": "aten::mul"
 }
 
 REDUCE_SPEC_TO_ATEN = {

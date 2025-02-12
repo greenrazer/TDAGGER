@@ -5,6 +5,8 @@ from typing import Dict, List, Set, Tuple, Type, Union
 from ..inputs.op_input import OpInput
 from ..inputs.unary_tensor_input import UnaryTensorInput
 from .op_spec import OpSpec
+from ...safe_ir import SpecType, TensorSpec, ScalarSpec
+from ....compute_stats import ComputeStats
 
 
 @dataclass
@@ -80,3 +82,9 @@ class UnaryElementwiseSpec(OpSpec):
 
     def format_input(self, input: UnaryTensorInput) -> str:
         return f"{self.type}(%{input.input})"
+
+    def output_spec(self, inputs: List[SpecType]) -> SpecType:
+        pass
+    
+    def compute_stats(self, inputs: List[SpecType]) -> ComputeStats:
+        pass

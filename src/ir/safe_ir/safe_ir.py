@@ -19,6 +19,9 @@ class DataType(Enum):
 class ScalarSpec:
     type: DataType
 
+    def size(self):
+        return 1
+
 
 @dataclass
 class ScalarType:
@@ -31,6 +34,11 @@ class TensorSpec:
     shape: Tuple[int, ...]
     data_type: DataType
 
+    def size(self):
+        out = 1
+        for s in self.shape:
+            out *= s
+        return out
 
 @dataclass
 class TensorType:
