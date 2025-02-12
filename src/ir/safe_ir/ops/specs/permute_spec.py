@@ -55,7 +55,36 @@ class PermuteSpec(OpSpec):
         return " ".join(out)
 
     def output_spec(self, inputs: List[SpecType]) -> SpecType:
-        pass
+        real_indices = [
+            (idx if idx >= 0 else len(inputs[0].shape) + idx) for idx in self.permutation
+        ]
+
+        if len(real_indices) != len(set(real_indices)):
+            raise Exception(f"Concrete pad dimensions must be unique: {real_indices}.")
+
+        real_indices_dict = {
+            (idx2 if idx2 >= 0 else len(inputs[0].shape) + idx2): (idx if idx >= 0 else len(inputs[0].shape) + idx)
+            for idx, idx2 in self.permutation.items()
+        }
+        seen = {idx: False for idx in real_indices}
+
+        out_shape = []
+        for i, size in enumerate(inputs[0].shape):
+            if i in real_indices_dict:
+                out_shape.append(inputs[0].shape[real_indices_dict[i]])
+                seen[i] = True
+            else:
+                out_shape.append(size)
+
+        if not all(seen.values()):
+            raise Exception(f"shape not sufficient for permute spec: {inputs[0].shape}.")
+
+        return TensorSpec(shape=out_shape, data_type=inputs[0].data_type)
     
     def compute_stats(self, inputs: List[SpecType]) -> ComputeStats:
-        pass
+        out_spec = self.output_spec(inputs)
+        return ComputeStats(
+            flops=0,  # just a reshaping
+            reads=inputs[0].size(),
+            writes=out_spec.size(),
+        )
