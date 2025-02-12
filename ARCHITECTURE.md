@@ -155,6 +155,14 @@ The nice thing about all these ops is that they all have inverses or pseudo inve
   - pad interleave # undialation
   - fold
   - slice
+- concat
+  - input 1 before pad
+  - input 2 after pad
+  - add
+- Stack
+  - input 1 unsqueeze
+  - input 2 unsqueeze
+  - cat
 - Activation functions
   - relu
     - (x + abs(x))/2
