@@ -1,13 +1,13 @@
+import math
 from dataclasses import dataclass
 from enum import Enum, auto
 from typing import Dict, List, Set, Tuple, Type, Union
-import math
 
+from ....compute_stats import ComputeStats
+from ...safe_ir import ScalarSpec, SpecType, TensorSpec
 from ..inputs.op_input import OpInput
 from ..inputs.unary_tensor_input import UnaryTensorInput
 from .op_spec import OpSpec
-from ...safe_ir import SpecType, TensorSpec, ScalarSpec
-from ....compute_stats import ComputeStats
 
 
 @dataclass
@@ -127,7 +127,7 @@ class GroupSpec(OpSpec):
     def compute_stats(self, inputs: List[SpecType]) -> ComputeStats:
         out_spec = self.output_spec(inputs)
         return ComputeStats(
-            flops=0, # just a reshaping
+            flops=0,  # just a reshaping
             reads=out_spec.size(),
-            writes=out_spec.size()
+            writes=out_spec.size(),
         )

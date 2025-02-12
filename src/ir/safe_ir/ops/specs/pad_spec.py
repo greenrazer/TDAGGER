@@ -1,13 +1,13 @@
+import math
 from dataclasses import dataclass
 from enum import Enum, auto
 from typing import Any, Dict, List, Set, Tuple, Type, Union
-import math
 
+from ....compute_stats import ComputeStats
+from ...safe_ir import ScalarSpec, SpecType, TensorSpec
 from ..inputs.op_input import OpInput
 from ..inputs.unary_tensor_input import UnaryTensorInput
 from .op_spec import OpSpec
-from ...safe_ir import SpecType, TensorSpec, ScalarSpec
-from ....compute_stats import ComputeStats
 
 
 @dataclass
@@ -96,14 +96,17 @@ class PadSpec(OpSpec):
         return f"{' '.join(out)} | mode={self.pad_mode}"
 
     def output_spec(self, inputs: List[SpecType]) -> SpecType:
-        real_indices = [(idx if idx >= 0 else len(inputs[0].shape) + idx)for idx in self.pad]
+        real_indices = [
+            (idx if idx >= 0 else len(inputs[0].shape) + idx) for idx in self.pad
+        ]
 
         if len(real_indices) != len(set(real_indices)):
-            raise Exception(
-                f"Concrete pad dimensions must be unique: {real_indices}."
-            )
+            raise Exception(f"Concrete pad dimensions must be unique: {real_indices}.")
 
-        real_indices_dict = {(idx if idx >= 0 else len(inputs[0].shape) + idx): p for idx, p in self.pad.items()}
+        real_indices_dict = {
+            (idx if idx >= 0 else len(inputs[0].shape) + idx): p
+            for idx, p in self.pad.items()
+        }
         seen = {idx: False for idx in real_indices}
 
         out_shape = []
@@ -114,16 +117,12 @@ class PadSpec(OpSpec):
                 seen[i] = True
             else:
                 out_shape.append(size)
-                
 
         if not all(seen.values()):
             raise Exception(f"shape not sufficient for pad spec: {inputs[0].shape}.")
 
-        return TensorSpec(
-            shape=out_shape,
-            data_type=inputs[0].data_type
-        )
-    
+        return TensorSpec(shape=out_shape, data_type=inputs[0].data_type)
+
     def compute_stats(self, inputs: List[SpecType]) -> ComputeStats:
         out_spec = self.output_spec(inputs)
 
@@ -132,7 +131,7 @@ class PadSpec(OpSpec):
         else:
             pad_reads = 0
         return ComputeStats(
-            flops=0, # just a reshaping
+            flops=0,  # just a reshaping
             reads=inputs[0].size() + pad_reads,
-            writes=out_spec.size()
+            writes=out_spec.size(),
         )

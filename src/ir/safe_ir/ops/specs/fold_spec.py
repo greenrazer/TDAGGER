@@ -2,11 +2,12 @@ from dataclasses import dataclass
 from enum import Enum, auto
 from typing import Dict, List, Set, Tuple, Type, Union
 
+from ....compute_stats import ComputeStats
+from ...safe_ir import ScalarSpec, SpecType, TensorSpec
 from ..inputs.op_input import OpInput
 from ..inputs.unary_tensor_input import UnaryTensorInput
 from .op_spec import OpSpec
-from ...safe_ir import SpecType, TensorSpec, ScalarSpec
-from ....compute_stats import ComputeStats
+
 
 @dataclass
 class FoldSpec(OpSpec):
@@ -49,9 +50,9 @@ class FoldSpec(OpSpec):
                 out.append("...")
 
         return " ".join(out)
-    
+
     def output_spec(self, inputs: List[SpecType]) -> SpecType:
-         # L_inv[d] = (L[d] - 1) * stride[d] + (kernel_size[d] - 1) + 1
+        # L_inv[d] = (L[d] - 1) * stride[d] + (kernel_size[d] - 1) + 1
         out_shape = []
         for i, size in enumerate(inputs[0].shape):
             if i not in self.fold:
@@ -60,24 +61,17 @@ class FoldSpec(OpSpec):
                 kernel_size, stride = self.fold[i]
                 out_shape.append((size - 1) * stride + (kernel_size - 1) + 1)
 
-        return TensorSpec(
-            shape=out_shape,
-            data_type=inputs[0].data_type
-        )
+        return TensorSpec(shape=out_shape, data_type=inputs[0].data_type)
 
     def compute_stats(self, inputs: List[SpecType]) -> ComputeStats:
         # out_spec = self.output_spec(inputs)
         # input_size = inputs[0].size()
         # output_size = out_spec.size()
         # non-folded-size = prod(non-folded-dims)
-        # overlap size per dim = (kernel_size[i] - stride[i]) 
+        # overlap size per dim = (kernel_size[i] - stride[i])
         # number of overlaps per dim = ceil(shape[i] - kernel_size[i] + stride[i]) / stride[i]) - 1
         # flops = non-folded-size * prod (overlap size per dim * number of overlaps per dim)
         # reads = non-folded-size * prod ( ceil(kernel_size[i]/stride[i])*shape[i] )
         # writes = non-folded-size * prod(ceil((N_i - k_i + s_i)/s_i) * k_i)
 
-        ComputeStats(
-            flops=0,
-            reads=0,
-            writes=0
-        )
+        ComputeStats(flops=0, reads=0, writes=0)
