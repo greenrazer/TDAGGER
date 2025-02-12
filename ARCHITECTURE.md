@@ -81,7 +81,7 @@
     - sin, arcsin, cos, arccos, tan, arctan, sinh, arcsinh, cosh, arccosh, tanh, arctanh
     - gaussian, inv_gaussian
 - binary ops
-  - add, multiply, exponentiate
+  - add, multiply
 - sign
 
 The nice thing about all these ops is that they all have inverses or pseudo inverses
@@ -113,6 +113,8 @@ The nice thing about all these ops is that they all have inverses or pseudo inve
 
 ## Example Derived ops
 
+- Pow
+  - Pow(A, B) = A^B = exp(log(A^B)) = exp(B*log(A))
 - Stride
   - pad
   - ungroup
