@@ -1,9 +1,6 @@
 import math
 import unittest
 
-import torch
-import torch.nn as nn
-
 from src.ir.safe_ir import DataType, GroupSpec, TensorSpec
 
 
