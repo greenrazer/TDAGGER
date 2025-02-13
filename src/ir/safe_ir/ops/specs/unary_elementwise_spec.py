@@ -70,11 +70,11 @@ class UnaryElementwiseSpec(OpSpec):
                 case UnaryElementwiseSpec.UnaryElementwiseType.ARCTANH:
                     return "arctanh"
 
-    unary_type: UnaryElementwiseType
+    op_type: UnaryElementwiseType
 
     @property
     def type(self) -> str:
-        return f"{self.unary_type}"
+        return f"{self.op_type}"
 
     @property
     def input_type(self) -> Type[OpInput]:
@@ -84,7 +84,13 @@ class UnaryElementwiseSpec(OpSpec):
         return f"{self.type}(%{input.input})"
 
     def output_spec(self, inputs: List[SpecType]) -> SpecType:
-        pass
+        return inputs[0]
 
     def compute_stats(self, inputs: List[SpecType]) -> ComputeStats:
-        pass
+        input_0_size = inputs[0].size()
+        output_size = self.output_spec(inputs).size()
+        return ComputeStats(
+            flops=0,  # one addition per element pair
+            reads=input_0_size,  # one read per element
+            writes=output_size,  # one write to the output tensor
+        )

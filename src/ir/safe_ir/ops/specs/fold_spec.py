@@ -52,26 +52,38 @@ class FoldSpec(OpSpec):
         return " ".join(out)
 
     def output_spec(self, inputs: List[SpecType]) -> SpecType:
-        # L_inv[d] = (L[d] - 1) * stride[d] + (kernel_size[d] - 1) + 1
+        real_indices = [
+            (idx if idx >= 0 else len(inputs[0].shape) + idx) for idx in self.fold
+        ]
+
+        if len(real_indices) != len(set(real_indices)):
+            raise Exception(f"Concrete pad dimensions must be unique: {real_indices}.")
+
+        real_indices_dict = {
+            (idx if idx >= 0 else len(inputs[0].shape) + idx): fld
+            for idx, fld in self.fold.items()
+        }
+
+        seen = {idx: False for idx in real_indices_dict}
+        
+        # L_inv[d] = (L[d]//kernel_size - 1) * stride[d] + kernel_size[d]
         out_shape = []
         for i, size in enumerate(inputs[0].shape):
-            if i not in self.fold:
-                out_shape.append(size)
+            if i in real_indices_dict:
+                kernel_size, stride = real_indices_dict[i]
+                out_shape.append((size//kernel_size - 1) * stride + kernel_size)
+                seen[i] = True
             else:
-                kernel_size, stride = self.fold[i]
-                out_shape.append((size - 1) * stride + (kernel_size - 1) + 1)
+                out_shape.append(size)
 
+        if not all(seen.values()):
+            raise Exception(f"shape not sufficient for fold spec: {inputs[0].shape}.")
+        
         return TensorSpec(shape=out_shape, data_type=inputs[0].data_type)
 
     def compute_stats(self, inputs: List[SpecType]) -> ComputeStats:
-        # out_spec = self.output_spec(inputs)
-        # input_size = inputs[0].size()
-        # output_size = out_spec.size()
-        # non-folded-size = prod(non-folded-dims)
-        # overlap size per dim = (kernel_size[i] - stride[i])
-        # number of overlaps per dim = ceil(shape[i] - kernel_size[i] + stride[i]) / stride[i]) - 1
-        # flops = non-folded-size * prod (overlap size per dim * number of overlaps per dim)
-        # reads = non-folded-size * prod ( ceil(kernel_size[i]/stride[i])*shape[i] )
-        # writes = non-folded-size * prod(ceil((N_i - k_i + s_i)/s_i) * k_i)
-
-        ComputeStats(flops=0, reads=0, writes=0)
+        return ComputeStats(
+            flops=0,
+            reads=0,
+            writes=0, 
+        )

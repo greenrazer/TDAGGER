@@ -7,7 +7,7 @@ import torch.nn as nn
 from src.ir.safe_ir import BinaryElementwiseSpec, DataType, TensorSpec
 
 
-class TestGroupOutputSpec(unittest.TestCase):
+class TestBinaryElementwiseOutputSpec(unittest.TestCase):
     def test_basic(self):
         spec = BinaryElementwiseSpec(
             op_type=BinaryElementwiseSpec.BinaryElementwiseType.ADD

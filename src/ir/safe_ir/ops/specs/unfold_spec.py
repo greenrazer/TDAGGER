@@ -52,7 +52,39 @@ class UnfoldSpec(OpSpec):
         return " ".join(out)
 
     def output_spec(self, inputs: List[SpecType]) -> SpecType:
-        pass
+        real_indices = [
+            (idx if idx >= 0 else len(inputs[0].shape) + idx) for idx in self.unfold
+        ]
+
+        if len(real_indices) != len(set(real_indices)):
+            raise Exception(f"Concrete unfold dimensions must be unique: {real_indices}.")
+
+        real_indices_dict = {
+            (idx if idx >= 0 else len(inputs[0].shape) + idx): fld
+            for idx, fld in self.unfold.items()
+        }
+
+        seen = {idx: False for idx in real_indices_dict}
+
+        #L[d] = kernel_size*((x.shape[d] - kernel_size[d]) / stride[d] + 1)
+
+        out_shape = []
+        for i, size in enumerate(inputs[0].shape):
+            if i in real_indices_dict:
+                kernel_size, stride = real_indices_dict[i]
+                out_shape.append(kernel_size*((size - kernel_size) // stride + 1))
+                seen[i] = True
+            else:
+                out_shape.append(size)
+
+        if not all(seen.values()):
+            raise Exception(f"shape not sufficient for unfold spec: {inputs[0].shape}.")
+
+        return TensorSpec(shape=out_shape, data_type=inputs[0].data_type)
 
     def compute_stats(self, inputs: List[SpecType]) -> ComputeStats:
-        pass
+        return ComputeStats(
+            flops=0,
+            reads=0,
+            writes=0, 
+        )

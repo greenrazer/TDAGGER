@@ -60,16 +60,8 @@ class BinaryElementwiseSpec(OpSpec):
         input_0_size = inputs[0].size()
         input_1_size = inputs[1].size()
         output_size = self.output_spec(inputs).size()
-        match self.op_type:
-            case BinaryElementwiseSpec.BinaryElementwiseType.ADD:
-                return ComputeStats(
-                    flops=output_size,  # one addition per element pair
-                    reads=input_0_size + input_1_size,  # one read from each tensor
-                    writes=output_size,  # one write to the output tensor
-                )
-            case BinaryElementwiseSpec.BinaryElementwiseType.MULTIPLY:
-                return ComputeStats(
-                    flops=output_size,  # one multiplication per element pair
-                    reads=input_0_size + input_1_size,  # one read from each tensor
-                    writes=output_size,  # one write to the output tensor
-                )
+        return ComputeStats(
+            flops=output_size,  # one addition per element pair
+            reads=input_0_size + input_1_size,  # one read from each tensor
+            writes=output_size,  # one write to the output tensor
+        )
