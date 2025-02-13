@@ -69,6 +69,14 @@ class ReduceSpec(OpSpec):
         return f"{' '.join(out)} | reduction={self.type}"
 
     def output_spec(self, inputs: List[SpecType]) -> SpecType:
+        real_indices = [
+            (idx if idx >= 0 else len(inputs[0].shape) + idx)
+            for idx in self.dimensions
+        ]
+
+        if len(real_indices) != len(set(real_indices)):
+            raise Exception(f"Concrete pad dimensions must be unique: {real_indices}.")
+        
         real_indices = {
             (idx if idx >= 0 else len(inputs[0].shape) + idx) for idx in self.dimensions
         }

@@ -63,7 +63,45 @@ class SliceSpec(OpSpec):
         return " ".join(out)
 
     def output_spec(self, inputs: List[SpecType]) -> SpecType:
-        pass
+        real_indices = [
+            (idx if idx >= 0 else len(inputs[0].shape) + idx) for idx in self.slice
+        ]
+
+        if len(real_indices) != len(set(real_indices)):
+            raise Exception(f"Concrete slice dimensions must be unique: {real_indices}.")
+
+        real_indices_dict = {
+            (idx if idx >= 0 else len(inputs[0].shape) + idx): sl
+            for idx, sl in self.slice.items()
+        }
+        seen = {idx: False for idx in real_indices}
+
+        out_shape = []
+        for i, size in enumerate(inputs[0].shape):
+            if i in real_indices_dict:
+                raw_begin, raw_end = real_indices_dict[i]
+                begin = (raw_begin if raw_begin >= 0 else size + raw_begin)
+                end = (raw_end if raw_end >= 0 else size + raw_end)
+                if begin >= size:
+                    raise Exception(f"Begin index must smaller than the size of the dimension: dimension={i} size={size} begin={begin}")
+                if end >= size:
+                    raise Exception(f"End index must smaller than the size of the dimension: dimension={i} size={size} end={end}")
+                if begin >= end:
+                    raise Exception(f"Begin index must be before end index: dimension={i} begin={begin} end={end}")
+                out_shape.append(end - begin + 1)
+                seen[i] = True
+            else:
+                out_shape.append(size)
+
+        if not all(seen.values()):
+            raise Exception(f"shape not sufficient for slice spec: {inputs[0].shape}.")
+
+        return TensorSpec(shape=out_shape, data_type=inputs[0].data_type)
     
     def compute_stats(self, inputs: List[SpecType]) -> ComputeStats:
-        pass
+        out_spec = self.output_spec(inputs)
+        return ComputeStats(
+            flops=0,
+            reads=out_spec.size(),
+            writes=out_spec.size(),
+        )

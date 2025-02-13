@@ -47,7 +47,36 @@ class SqueezeSpec(OpSpec):
         return " ".join(out)
 
     def output_spec(self, inputs: List[SpecType]) -> SpecType:
-        pass
+        real_indices = [
+            (idx if idx >= 0 else len(inputs[0].shape) + idx) for idx in self.dimensions
+        ]
+
+        if len(real_indices) != len(set(real_indices)):
+            raise Exception(f"Concrete repeat dimensions must be unique: {real_indices}.")
+    
+        real_indices = {
+            (idx if idx >= 0 else len(inputs[0].shape) + idx) for idx in self.dimensions
+        }
+        seen = {idx: False for idx in real_indices}
+
+        out_shape = []
+        for i, size in enumerate(inputs[0].shape):
+            if i in real_indices:
+                if size != 1:
+                    raise Exception(f"cannot squeeze dimension with size greater than 1: dimension={i} size={size}.")
+                seen[i] = True
+            else:
+                out_shape.append(size)
+
+        if not all(seen.values()):
+            raise Exception(f"shape not sufficient for squeeze spec: {inputs[0].shape}.")
+
+        return TensorSpec(shape=out_shape, data_type=inputs[0].data_type)
     
     def compute_stats(self, inputs: List[SpecType]) -> ComputeStats:
-        pass
+        out_spec = self.output_spec(inputs)
+        return ComputeStats(
+            flops=0,
+            reads=out_spec.size(),
+            writes=out_spec.size(),
+        )

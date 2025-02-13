@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 from enum import Enum, auto
 from typing import Dict, List, Set, Tuple, Type, Union
+import math
 
 from ..inputs.op_input import OpInput
 from ..inputs.unary_tensor_input import UnaryTensorInput
@@ -57,7 +58,49 @@ class UngroupSpec(OpSpec):
         return f"{' '.join(out)}"
 
     def output_spec(self, inputs: List[SpecType]) -> SpecType:
-        pass
-    
+        real_indices = [
+            (idx if idx >= 0 else len(inputs[0].shape) + idx)
+            for idx in self.ungroups
+        ]
+
+        if len(real_indices) != len(set(real_indices)):
+            raise Exception(f"Concrete pad dimensions must be unique: {real_indices}.")
+
+        real_indices_dict = {
+            (idx if idx >= 0 else len(inputs[0].shape) + idx): ug for idx, ug in self.ungroups.items()
+        }
+
+        seen = {idx: False for idx in real_indices_dict}
+
+        out_shape = []
+        for i, size in enumerate(inputs[0].shape):
+            if i in real_indices_dict:
+                ungroup = real_indices_dict[i].copy()
+                if -1 in ungroup:
+                    divisor = math.prod([idx for idx in ungroup if idx != -1])
+                    if size % divisor != 0:
+                        raise Exception(f"Cannot reshape: {size} into {ungroup}.")
+                    missing_index = ungroup.index(-1)
+                    ungroup[missing_index] = size // divisor
+                else:
+                    divisor = math.prod([idx for idx in ungroup])
+                    if size != divisor:
+                        raise Exception(f"Cannot reshape: {size} into {ungroup}.")
+                
+                out_shape.extend(ungroup)
+                seen[i] = True
+            else:
+                out_shape.append(size)
+
+        if not all(seen.values()):
+            raise Exception(f"shape not sufficient for ungroup spec: {inputs[0].shape}.")
+
+        return TensorSpec(shape=out_shape, data_type=inputs[0].data_type)
+
     def compute_stats(self, inputs: List[SpecType]) -> ComputeStats:
-        pass
+        out_spec = self.output_spec(inputs)
+        return ComputeStats(
+            flops=0,  # just a reshaping
+            reads=out_spec.size(),
+            writes=out_spec.size(),
+        )

@@ -32,6 +32,16 @@ class TestReduceOutputSpec(unittest.TestCase):
         self.assertEqual(out_spec.shape, [5, 1, 1, 4])
         self.assertEqual(out_spec.data_type, DataType.FLOAT32)
 
+    def test_raises_on_overlapping_dimensions(self):
+        spec = ReduceSpec(
+            dimensions={3, -1}, reduction_type=ReduceSpec.ReductionType.SUM
+        )
+
+        input_specs = [TensorSpec(shape=(5, 2, 3, 4), data_type=DataType.FLOAT32)]
+
+        with self.assertRaises(Exception):
+            spec.output_spec(input_specs)
+
     def test_raises_on_insufficient_shape(self):
         spec = ReduceSpec(
             dimensions={3, 4}, reduction_type=ReduceSpec.ReductionType.SUM

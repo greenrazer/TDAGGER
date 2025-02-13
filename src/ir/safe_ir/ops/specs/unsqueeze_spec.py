@@ -47,7 +47,29 @@ class UnsqueezeSpec(OpSpec):
         return " ".join(out)
 
     def output_spec(self, inputs: List[SpecType]) -> SpecType:
-        pass
+        positive_real_inds = sorted([idx for idx in self.dimensions if idx >= 0])
+        positive_real_inds_set = set(positive_real_inds)
+
+        out_shape = list(inputs[0].shape)
+        for i in positive_real_inds:
+            if i > len(out_shape):
+                raise Exception(f"Cannot unsqueeze more than one past the end of the shape: shape={out_shape} unsqueeze_dim={i}.")
+            out_shape.insert(i, 1)
+
+        for i in sorted([idx for idx in self.dimensions if idx < 0]):
+            real_idx = len(out_shape) + i + 1
+            if real_idx in positive_real_inds_set:
+                raise Exception(f"Cannot unsqueeze same dimension twice: shape={out_shape} unsqueeze_dim={real_idx} orignal_dim={i}.")
+            if real_idx < 0:
+                raise Exception(f"Cannot unsqueeze past the beginning of the shape: shape={out_shape} unsqueeze_dim={i}.")
+            out_shape.insert(real_idx, 1)
+
+        return TensorSpec(shape=out_shape, data_type=inputs[0].data_type)
     
     def compute_stats(self, inputs: List[SpecType]) -> ComputeStats:
-        pass
+        out_spec = self.output_spec(inputs)
+        return ComputeStats(
+            flops=0,
+            reads=out_spec.size(),
+            writes=out_spec.size(),
+        )
