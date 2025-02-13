@@ -6,7 +6,7 @@ from .dag_graph import DAGGraph
 class Refiner:
     def __init__(self, passes: List[Tuple[str, Callable[[DAGGraph], DAGGraph]]] = []):
         default_passes = [("remove unused constants", self.remove_unused_constants)]
-        self.passes = passes if len(passes) > 0 else  default_passes
+        self.passes = passes if len(passes) > 0 else default_passes
 
     def refine(self, graph: DAGGraph) -> DAGGraph:
         last_graph = graph

@@ -1,6 +1,7 @@
 from abc import ABC, abstractmethod
 from typing import Callable, List, Tuple, Any
 
+
 class Lowerer(ABC):
     def __init__(self, passes: List[Tuple[str, Callable[[Any], Any]]] = []):
         self.passes = passes if len(passes) > 0 else self.default_passes

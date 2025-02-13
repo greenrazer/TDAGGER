@@ -24,7 +24,7 @@ class SafeDAG:
 
     def to_torchscript(self) -> torch.nn.Module:
         lowerer = TorchLowerer()
-        out_graph = lowerer.lower(self.graph)
-        
-        reifier = TorchReifier(out_graph)
+        lowered_graph = lowerer.lower(self.graph)
+
+        reifier = TorchReifier(lowered_graph)
         return reifier.export()
