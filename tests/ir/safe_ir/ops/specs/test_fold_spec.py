@@ -4,21 +4,18 @@ import unittest
 import torch
 import torch.nn as nn
 
-from src.ir.safe_ir import FoldSpec, DataType, TensorSpec
+from src.ir.safe_ir import DataType, FoldSpec, TensorSpec
 
 
 class TestFoldOutputSpec(unittest.TestCase):
     def test_basic(self):
         spec = FoldSpec(
-            fold={
-                2: (3, 2),
-                3: (5, 2)
-            },
-            _output_shape_sidecar=[] # doesn't matter
+            fold={2: (3, 2), 3: (5, 2)},
+            _output_shape_sidecar=[],  # doesn't matter
         )
 
         input_specs = [
-            TensorSpec(shape=[2, 3, 3*16, 5*14], data_type=DataType.FLOAT32),
+            TensorSpec(shape=[2, 3, 3 * 16, 5 * 14], data_type=DataType.FLOAT32),
         ]
 
         out_spec = spec.output_spec(input_specs)
@@ -28,15 +25,12 @@ class TestFoldOutputSpec(unittest.TestCase):
 
     def test_negative_dimensions(self):
         spec = FoldSpec(
-            fold={
-                -2: (3, 2),
-                3: (5, 2)
-            },
-            _output_shape_sidecar=[] # doesn't matter
+            fold={-2: (3, 2), 3: (5, 2)},
+            _output_shape_sidecar=[],  # doesn't matter
         )
 
         input_specs = [
-            TensorSpec(shape=[2, 3, 3*16, 5*14], data_type=DataType.FLOAT32),
+            TensorSpec(shape=[2, 3, 3 * 16, 5 * 14], data_type=DataType.FLOAT32),
         ]
 
         out_spec = spec.output_spec(input_specs)
@@ -46,11 +40,8 @@ class TestFoldOutputSpec(unittest.TestCase):
 
     def test_raises_on_overlap(self):
         spec = FoldSpec(
-            fold={
-                -1: (3, 2),
-                3: (5, 2)
-            },
-            _output_shape_sidecar=[] # doesn't matter
+            fold={-1: (3, 2), 3: (5, 2)},
+            _output_shape_sidecar=[],  # doesn't matter
         )
 
         input_specs = [
@@ -62,11 +53,8 @@ class TestFoldOutputSpec(unittest.TestCase):
 
     def test_raises_on_insufficient_shape(self):
         spec = FoldSpec(
-            fold={
-                2: (3, 2),
-                4: (5, 2)
-            },
-            _output_shape_sidecar=[] # doesn't matter
+            fold={2: (3, 2), 4: (5, 2)},
+            _output_shape_sidecar=[],  # doesn't matter
         )
 
         input_specs = [

@@ -65,25 +65,25 @@ class FoldSpec(OpSpec):
         }
 
         seen = {idx: False for idx in real_indices_dict}
-        
+
         # L_inv[d] = (L[d]//kernel_size - 1) * stride[d] + kernel_size[d]
         out_shape = []
         for i, size in enumerate(inputs[0].shape):
             if i in real_indices_dict:
                 kernel_size, stride = real_indices_dict[i]
-                out_shape.append((size//kernel_size - 1) * stride + kernel_size)
+                out_shape.append((size // kernel_size - 1) * stride + kernel_size)
                 seen[i] = True
             else:
                 out_shape.append(size)
 
         if not all(seen.values()):
             raise Exception(f"shape not sufficient for fold spec: {inputs[0].shape}.")
-        
+
         return TensorSpec(shape=out_shape, data_type=inputs[0].data_type)
 
     def compute_stats(self, inputs: List[SpecType]) -> ComputeStats:
         return ComputeStats(
             flops=0,
             reads=0,
-            writes=0, 
+            writes=0,
         )

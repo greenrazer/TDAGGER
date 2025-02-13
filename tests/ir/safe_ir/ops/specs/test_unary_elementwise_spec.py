@@ -4,7 +4,7 @@ import unittest
 import torch
 import torch.nn as nn
 
-from src.ir.safe_ir import UnaryElementwiseSpec, DataType, TensorSpec
+from src.ir.safe_ir import DataType, TensorSpec, UnaryElementwiseSpec
 
 
 class TestUnaryElementwiseOutputSpec(unittest.TestCase):

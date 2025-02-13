@@ -57,7 +57,9 @@ class UnfoldSpec(OpSpec):
         ]
 
         if len(real_indices) != len(set(real_indices)):
-            raise Exception(f"Concrete unfold dimensions must be unique: {real_indices}.")
+            raise Exception(
+                f"Concrete unfold dimensions must be unique: {real_indices}."
+            )
 
         real_indices_dict = {
             (idx if idx >= 0 else len(inputs[0].shape) + idx): fld
@@ -66,13 +68,13 @@ class UnfoldSpec(OpSpec):
 
         seen = {idx: False for idx in real_indices_dict}
 
-        #L[d] = kernel_size*((x.shape[d] - kernel_size[d]) / stride[d] + 1)
+        # L[d] = kernel_size*((x.shape[d] - kernel_size[d]) / stride[d] + 1)
 
         out_shape = []
         for i, size in enumerate(inputs[0].shape):
             if i in real_indices_dict:
                 kernel_size, stride = real_indices_dict[i]
-                out_shape.append(kernel_size*((size - kernel_size) // stride + 1))
+                out_shape.append(kernel_size * ((size - kernel_size) // stride + 1))
                 seen[i] = True
             else:
                 out_shape.append(size)
@@ -86,5 +88,5 @@ class UnfoldSpec(OpSpec):
         return ComputeStats(
             flops=0,
             reads=0,
-            writes=0, 
+            writes=0,
         )
