@@ -1,10 +1,10 @@
-import unittest
 import math
+import unittest
 
 import torch
 import torch.nn as nn
 
-from src.ir.safe_ir import PermuteSpec, TensorSpec, DataType
+from src.ir.safe_ir import DataType, PermuteSpec, TensorSpec
 
 
 class TestPermuteSpec(unittest.TestCase):

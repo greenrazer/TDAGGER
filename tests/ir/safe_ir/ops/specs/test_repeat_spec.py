@@ -10,11 +10,8 @@ from src.ir.safe_ir import DataType, RepeatSpec, TensorSpec
 class TestRepeatOutputSpec(unittest.TestCase):
     def test_basic(self):
         spec = RepeatSpec(
-            repeat= {
-                1: 3,
-                2: 4
-            },
-            _output_dims_sidecar=0 # shouldn't need this
+            repeat={1: 3, 2: 4},
+            _output_dims_sidecar=0,  # shouldn't need this
         )
 
         input_specs = [TensorSpec(shape=(5, 1, 1, 4), data_type=DataType.FLOAT32)]
@@ -26,11 +23,8 @@ class TestRepeatOutputSpec(unittest.TestCase):
 
     def test_negitive_dimensions(self):
         spec = RepeatSpec(
-            repeat= {
-                1: 3,
-                -2: 4
-            },
-            _output_dims_sidecar=0 # shouldn't need this
+            repeat={1: 3, -2: 4},
+            _output_dims_sidecar=0,  # shouldn't need this
         )
 
         input_specs = [TensorSpec(shape=(5, 1, 1, 4), data_type=DataType.FLOAT32)]
@@ -42,11 +36,8 @@ class TestRepeatOutputSpec(unittest.TestCase):
 
     def test_raises_on_overlapping_dimensions(self):
         spec = RepeatSpec(
-            repeat= {
-                3: 3,
-                -1: 4
-            },
-            _output_dims_sidecar=0 # shouldn't need this
+            repeat={3: 3, -1: 4},
+            _output_dims_sidecar=0,  # shouldn't need this
         )
 
         input_specs = [TensorSpec(shape=(1, 1, 1, 1), data_type=DataType.FLOAT32)]
@@ -56,11 +47,8 @@ class TestRepeatOutputSpec(unittest.TestCase):
 
     def test_raises_on_insufficient_shape(self):
         spec = RepeatSpec(
-            repeat= {
-                1: 3,
-                4: 4
-            },
-            _output_dims_sidecar=0 # shouldn't need this
+            repeat={1: 3, 4: 4},
+            _output_dims_sidecar=0,  # shouldn't need this
         )
 
         input_specs = [TensorSpec(shape=(5, 1, 1, 4), data_type=DataType.FLOAT32)]
@@ -70,11 +58,8 @@ class TestRepeatOutputSpec(unittest.TestCase):
 
     def test_raises_on_size_greater_than_one(self):
         spec = RepeatSpec(
-            repeat= {
-                0: 3,
-                1: 4
-            },
-            _output_dims_sidecar=0 # shouldn't need this
+            repeat={0: 3, 1: 4},
+            _output_dims_sidecar=0,  # shouldn't need this
         )
 
         input_specs = [TensorSpec(shape=(5, 1, 1, 4), data_type=DataType.FLOAT32)]
@@ -86,11 +71,8 @@ class TestRepeatOutputSpec(unittest.TestCase):
 class TestRepeatComputeStats(unittest.TestCase):
     def test_basic(self):
         spec = RepeatSpec(
-            repeat= {
-                1: 3,
-                2: 4
-            },
-            _output_dims_sidecar=0 # shouldn't need this
+            repeat={1: 3, 2: 4},
+            _output_dims_sidecar=0,  # shouldn't need this
         )
 
         input_specs = [TensorSpec(shape=(5, 1, 1, 4), data_type=DataType.FLOAT32)]

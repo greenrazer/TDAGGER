@@ -4,37 +4,30 @@ import unittest
 import torch
 import torch.nn as nn
 
-from src.ir.safe_ir import DataType, UngroupSpec, TensorSpec
+from src.ir.safe_ir import DataType, TensorSpec, UngroupSpec
+
 
 class TestUngroupSpec(unittest.TestCase):
     def test_basic(self):
         # doesn't raise
         UngroupSpec(
-            ungroups={
-                1: [2,4],
-                2: [2,2]
-            },
-            _output_shape_sidecar=0 # doesn't matter
+            ungroups={1: [2, 4], 2: [2, 2]},
+            _output_shape_sidecar=0,  # doesn't matter
         )
 
     def test_raises_on_multiple_missing_ungroups_per_group(self):
         with self.assertRaises(Exception):
             UngroupSpec(
-                ungroups={
-                    1: [-1, -1, 1],
-                    2: [2,2]
-                },
-                _output_shape_sidecar=0 # doesn't matter
+                ungroups={1: [-1, -1, 1], 2: [2, 2]},
+                _output_shape_sidecar=0,  # doesn't matter
             )
+
 
 class TestUngroupOutputSpec(unittest.TestCase):
     def test_basic(self):
         spec = UngroupSpec(
-            ungroups={
-                1: [2,4],
-                2: [2,2]
-            },
-            _output_shape_sidecar=0 # doesn't matter
+            ungroups={1: [2, 4], 2: [2, 2]},
+            _output_shape_sidecar=0,  # doesn't matter
         )
 
         input_specs = [TensorSpec(shape=(6, 8, 4, 2), data_type=DataType.FLOAT32)]
@@ -46,11 +39,8 @@ class TestUngroupOutputSpec(unittest.TestCase):
 
     def test_negitive_dimensions(self):
         spec = UngroupSpec(
-            ungroups={
-                1: [2,4],
-                -2: [2,2]
-            },
-            _output_shape_sidecar=0 # doesn't matter
+            ungroups={1: [2, 4], -2: [2, 2]},
+            _output_shape_sidecar=0,  # doesn't matter
         )
 
         input_specs = [TensorSpec(shape=(6, 8, 4, 2), data_type=DataType.FLOAT32)]
@@ -62,11 +52,8 @@ class TestUngroupOutputSpec(unittest.TestCase):
 
     def test_missing_dimensions(self):
         spec = UngroupSpec(
-            ungroups={
-                1: [-1,4],
-                -2: [-1,2]
-            },
-            _output_shape_sidecar=0 # doesn't matter
+            ungroups={1: [-1, 4], -2: [-1, 2]},
+            _output_shape_sidecar=0,  # doesn't matter
         )
 
         input_specs = [TensorSpec(shape=(6, 8, 4, 2), data_type=DataType.FLOAT32)]
@@ -78,11 +65,8 @@ class TestUngroupOutputSpec(unittest.TestCase):
 
     def test_raises_on_insufficient_shape(self):
         spec = UngroupSpec(
-            ungroups={
-                1: [2,4],
-                4: [2,2]
-            },
-            _output_shape_sidecar=0 # doesn't matter
+            ungroups={1: [2, 4], 4: [2, 2]},
+            _output_shape_sidecar=0,  # doesn't matter
         )
 
         input_specs = [TensorSpec(shape=(6, 8, 4, 2), data_type=DataType.FLOAT32)]
@@ -92,11 +76,8 @@ class TestUngroupOutputSpec(unittest.TestCase):
 
     def test_raises_on_cannot_reshape(self):
         spec = UngroupSpec(
-            ungroups={
-                1: [3,4],
-                4: [2,2]
-            },
-            _output_shape_sidecar=0 # doesn't matter
+            ungroups={1: [3, 4], 4: [2, 2]},
+            _output_shape_sidecar=0,  # doesn't matter
         )
 
         input_specs = [TensorSpec(shape=(6, 8, 4, 2), data_type=DataType.FLOAT32)]
@@ -106,11 +87,8 @@ class TestUngroupOutputSpec(unittest.TestCase):
 
     def test_raises_on_cannot_reshape_missing_dimension(self):
         spec = UngroupSpec(
-            ungroups={
-                1: [-1,3],
-                4: [2,2]
-            },
-            _output_shape_sidecar=0 # doesn't matter
+            ungroups={1: [-1, 3], 4: [2, 2]},
+            _output_shape_sidecar=0,  # doesn't matter
         )
 
         input_specs = [TensorSpec(shape=(6, 8, 4, 2), data_type=DataType.FLOAT32)]
@@ -118,14 +96,12 @@ class TestUngroupOutputSpec(unittest.TestCase):
         with self.assertRaises(Exception):
             spec.output_spec(input_specs)
 
+
 class TestUngroupComputeStats(unittest.TestCase):
     def test_basic(self):
         spec = UngroupSpec(
-            ungroups={
-                1: [2,4],
-                2: [2,2]
-            },
-            _output_shape_sidecar=0 # doesn't matter
+            ungroups={1: [2, 4], 2: [2, 2]},
+            _output_shape_sidecar=0,  # doesn't matter
         )
 
         input_specs = [TensorSpec(shape=(6, 8, 4, 2), data_type=DataType.FLOAT32)]

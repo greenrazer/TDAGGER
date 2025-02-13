@@ -2,11 +2,11 @@ from dataclasses import dataclass
 from enum import Enum, auto
 from typing import Any, Dict, List, Set, Tuple, Type, Union
 
+from ....compute_stats import ComputeStats
+from ...safe_ir import ScalarSpec, SpecType, TensorSpec
 from ..inputs.op_input import OpInput
 from ..inputs.unary_tensor_input import UnaryTensorInput
 from .op_spec import OpSpec
-from ...safe_ir import SpecType, TensorSpec, ScalarSpec
-from ....compute_stats import ComputeStats
 
 
 @dataclass
@@ -53,19 +53,25 @@ class UnsqueezeSpec(OpSpec):
         out_shape = list(inputs[0].shape)
         for i in positive_real_inds:
             if i > len(out_shape):
-                raise Exception(f"Cannot unsqueeze more than one past the end of the shape: shape={out_shape} unsqueeze_dim={i}.")
+                raise Exception(
+                    f"Cannot unsqueeze more than one past the end of the shape: shape={out_shape} unsqueeze_dim={i}."
+                )
             out_shape.insert(i, 1)
 
         for i in sorted([idx for idx in self.dimensions if idx < 0]):
             real_idx = len(out_shape) + i + 1
             if real_idx in positive_real_inds_set:
-                raise Exception(f"Cannot unsqueeze same dimension twice: shape={out_shape} unsqueeze_dim={real_idx} orignal_dim={i}.")
+                raise Exception(
+                    f"Cannot unsqueeze same dimension twice: shape={out_shape} unsqueeze_dim={real_idx} orignal_dim={i}."
+                )
             if real_idx < 0:
-                raise Exception(f"Cannot unsqueeze past the beginning of the shape: shape={out_shape} unsqueeze_dim={i}.")
+                raise Exception(
+                    f"Cannot unsqueeze past the beginning of the shape: shape={out_shape} unsqueeze_dim={i}."
+                )
             out_shape.insert(real_idx, 1)
 
         return TensorSpec(shape=out_shape, data_type=inputs[0].data_type)
-    
+
     def compute_stats(self, inputs: List[SpecType]) -> ComputeStats:
         out_spec = self.output_spec(inputs)
         return ComputeStats(

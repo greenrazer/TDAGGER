@@ -2,11 +2,11 @@ from dataclasses import dataclass
 from enum import Enum, auto
 from typing import Any, Dict, List, Set, Tuple, Type, Union
 
+from ....compute_stats import ComputeStats
+from ...safe_ir import ScalarSpec, SpecType, TensorSpec
 from ..inputs.op_input import OpInput
 from ..inputs.unary_tensor_input import UnaryTensorInput
 from .op_spec import OpSpec
-from ...safe_ir import SpecType, TensorSpec, ScalarSpec
-from ....compute_stats import ComputeStats
 
 
 @dataclass
@@ -52,8 +52,10 @@ class SqueezeSpec(OpSpec):
         ]
 
         if len(real_indices) != len(set(real_indices)):
-            raise Exception(f"Concrete repeat dimensions must be unique: {real_indices}.")
-    
+            raise Exception(
+                f"Concrete repeat dimensions must be unique: {real_indices}."
+            )
+
         real_indices = {
             (idx if idx >= 0 else len(inputs[0].shape) + idx) for idx in self.dimensions
         }
@@ -63,16 +65,20 @@ class SqueezeSpec(OpSpec):
         for i, size in enumerate(inputs[0].shape):
             if i in real_indices:
                 if size != 1:
-                    raise Exception(f"cannot squeeze dimension with size greater than 1: dimension={i} size={size}.")
+                    raise Exception(
+                        f"cannot squeeze dimension with size greater than 1: dimension={i} size={size}."
+                    )
                 seen[i] = True
             else:
                 out_shape.append(size)
 
         if not all(seen.values()):
-            raise Exception(f"shape not sufficient for squeeze spec: {inputs[0].shape}.")
+            raise Exception(
+                f"shape not sufficient for squeeze spec: {inputs[0].shape}."
+            )
 
         return TensorSpec(shape=out_shape, data_type=inputs[0].data_type)
-    
+
     def compute_stats(self, inputs: List[SpecType]) -> ComputeStats:
         out_spec = self.output_spec(inputs)
         return ComputeStats(

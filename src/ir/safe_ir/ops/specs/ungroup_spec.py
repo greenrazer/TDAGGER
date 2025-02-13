@@ -1,13 +1,13 @@
+import math
 from dataclasses import dataclass
 from enum import Enum, auto
 from typing import Dict, List, Set, Tuple, Type, Union
-import math
 
+from ....compute_stats import ComputeStats
+from ...safe_ir import ScalarSpec, SpecType, TensorSpec
 from ..inputs.op_input import OpInput
 from ..inputs.unary_tensor_input import UnaryTensorInput
 from .op_spec import OpSpec
-from ...safe_ir import SpecType, TensorSpec, ScalarSpec
-from ....compute_stats import ComputeStats
 
 
 @dataclass
@@ -59,15 +59,15 @@ class UngroupSpec(OpSpec):
 
     def output_spec(self, inputs: List[SpecType]) -> SpecType:
         real_indices = [
-            (idx if idx >= 0 else len(inputs[0].shape) + idx)
-            for idx in self.ungroups
+            (idx if idx >= 0 else len(inputs[0].shape) + idx) for idx in self.ungroups
         ]
 
         if len(real_indices) != len(set(real_indices)):
             raise Exception(f"Concrete pad dimensions must be unique: {real_indices}.")
 
         real_indices_dict = {
-            (idx if idx >= 0 else len(inputs[0].shape) + idx): ug for idx, ug in self.ungroups.items()
+            (idx if idx >= 0 else len(inputs[0].shape) + idx): ug
+            for idx, ug in self.ungroups.items()
         }
 
         seen = {idx: False for idx in real_indices_dict}
@@ -86,14 +86,16 @@ class UngroupSpec(OpSpec):
                     divisor = math.prod([idx for idx in ungroup])
                     if size != divisor:
                         raise Exception(f"Cannot reshape: {size} into {ungroup}.")
-                
+
                 out_shape.extend(ungroup)
                 seen[i] = True
             else:
                 out_shape.append(size)
 
         if not all(seen.values()):
-            raise Exception(f"shape not sufficient for ungroup spec: {inputs[0].shape}.")
+            raise Exception(
+                f"shape not sufficient for ungroup spec: {inputs[0].shape}."
+            )
 
         return TensorSpec(shape=out_shape, data_type=inputs[0].data_type)
 

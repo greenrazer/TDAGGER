@@ -2,16 +2,16 @@ from dataclasses import dataclass
 from enum import Enum, auto
 from typing import Any, Dict, List, Set, Tuple, Type, Union
 
+from ....compute_stats import ComputeStats
+from ...safe_ir import ScalarSpec, SpecType, TensorSpec
 from ..inputs.op_input import OpInput
 from ..inputs.unary_tensor_input import UnaryTensorInput
 from .op_spec import OpSpec
-from ...safe_ir import SpecType, TensorSpec, ScalarSpec
-from ....compute_stats import ComputeStats
 
 
 @dataclass
 class SelectSpec(OpSpec):
-    select: Dict[int, int] # dimension -> index
+    select: Dict[int, int]  # dimension -> index
 
     @property
     def type(self) -> str:
@@ -54,10 +54,13 @@ class SelectSpec(OpSpec):
         ]
 
         if len(real_indices) != len(set(real_indices)):
-            raise Exception(f"Concrete select dimensions must be unique: {real_indices}.")
-        
+            raise Exception(
+                f"Concrete select dimensions must be unique: {real_indices}."
+            )
+
         real_indices_dict = {
-            (idx if idx >= 0 else len(inputs[0].shape) + idx): idx2 for idx, idx2 in self.select.items()
+            (idx if idx >= 0 else len(inputs[0].shape) + idx): idx2
+            for idx, idx2 in self.select.items()
         }
 
         seen = {idx: False for idx in real_indices}
@@ -65,9 +68,15 @@ class SelectSpec(OpSpec):
         out_shape = []
         for i, size in enumerate(inputs[0].shape):
             if i in real_indices_dict:
-                real_select = real_indices_dict[i] if real_indices_dict[i] >= 0 else size + real_indices_dict[i]
+                real_select = (
+                    real_indices_dict[i]
+                    if real_indices_dict[i] >= 0
+                    else size + real_indices_dict[i]
+                )
                 if real_select >= size:
-                    raise Exception(f"Select out of bounds: dimension={i} size={size} index={real_select}")
+                    raise Exception(
+                        f"Select out of bounds: dimension={i} size={size} index={real_select}"
+                    )
                 out_shape.append(1)
                 seen[i] = True
             else:
@@ -77,7 +86,7 @@ class SelectSpec(OpSpec):
             raise Exception(f"shape not sufficient for select spec: {inputs[0].shape}.")
 
         return TensorSpec(shape=out_shape, data_type=inputs[0].data_type)
-    
+
     def compute_stats(self, inputs: List[SpecType]) -> ComputeStats:
         out_spec = self.output_spec(inputs)
         return ComputeStats(

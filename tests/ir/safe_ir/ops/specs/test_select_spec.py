@@ -9,12 +9,7 @@ from src.ir.safe_ir import DataType, SelectSpec, TensorSpec
 
 class TestSelectOutputSpec(unittest.TestCase):
     def test_basic(self):
-        spec = SelectSpec(
-            select= {
-                1: 0,
-                2: 1
-            }
-        )
+        spec = SelectSpec(select={1: 0, 2: 1})
 
         input_specs = [TensorSpec(shape=(5, 2, 3, 4), data_type=DataType.FLOAT32)]
 
@@ -24,12 +19,7 @@ class TestSelectOutputSpec(unittest.TestCase):
         self.assertEqual(out_spec.data_type, DataType.FLOAT32)
 
     def test_negitive_dimensions(self):
-        spec = SelectSpec(
-            select= {
-                1: 0,
-                -2: 1
-            }
-        )
+        spec = SelectSpec(select={1: 0, -2: 1})
 
         input_specs = [TensorSpec(shape=(5, 2, 3, 4), data_type=DataType.FLOAT32)]
 
@@ -39,12 +29,7 @@ class TestSelectOutputSpec(unittest.TestCase):
         self.assertEqual(out_spec.data_type, DataType.FLOAT32)
 
     def test_negitive_select(self):
-        spec = SelectSpec(
-            select= {
-                1: 0,
-                -2: -1
-            }
-        )
+        spec = SelectSpec(select={1: 0, -2: -1})
 
         input_specs = [TensorSpec(shape=(5, 2, 3, 4), data_type=DataType.FLOAT32)]
 
@@ -54,12 +39,7 @@ class TestSelectOutputSpec(unittest.TestCase):
         self.assertEqual(out_spec.data_type, DataType.FLOAT32)
 
     def test_raises_on_overlapping_dimensions(self):
-        spec = SelectSpec(
-            select= {
-                2: 0,
-                -2: 1
-            }
-        )
+        spec = SelectSpec(select={2: 0, -2: 1})
 
         input_specs = [TensorSpec(shape=(5, 2, 3, 4), data_type=DataType.FLOAT32)]
 
@@ -67,12 +47,7 @@ class TestSelectOutputSpec(unittest.TestCase):
             spec.output_spec(input_specs)
 
     def test_raises_on_insufficient_shape(self):
-        spec = SelectSpec(
-            select= {
-                2: 0,
-                4: 1
-            }
-        )
+        spec = SelectSpec(select={2: 0, 4: 1})
 
         input_specs = [TensorSpec(shape=(5, 2, 3, 4), data_type=DataType.FLOAT32)]
 
@@ -82,12 +57,7 @@ class TestSelectOutputSpec(unittest.TestCase):
 
 class TestSelectComputeStats(unittest.TestCase):
     def test_basic(self):
-        spec = SelectSpec(
-            select= {
-                1: 0,
-                2: 1
-            }
-        )
+        spec = SelectSpec(select={1: 0, 2: 1})
 
         input_specs = [TensorSpec(shape=(5, 2, 3, 4), data_type=DataType.FLOAT32)]
 

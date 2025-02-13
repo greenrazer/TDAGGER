@@ -2,11 +2,11 @@ from dataclasses import dataclass
 from enum import Enum, auto
 from typing import Any, Dict, List, Set, Tuple, Type, Union
 
+from ....compute_stats import ComputeStats
+from ...safe_ir import ScalarSpec, SpecType, TensorSpec
 from ..inputs.op_input import OpInput
 from ..inputs.unary_tensor_input import UnaryTensorInput
 from .op_spec import OpSpec
-from ...safe_ir import SpecType, TensorSpec, ScalarSpec
-from ....compute_stats import ComputeStats
 
 
 @dataclass

@@ -2,11 +2,11 @@ from dataclasses import dataclass
 from enum import Enum, auto
 from typing import Any, Dict, List, Set, Tuple, Type, Union
 
+from ....compute_stats import ComputeStats
+from ...safe_ir import ScalarSpec, SpecType, TensorSpec
 from ..inputs.op_input import OpInput
 from ..inputs.unary_tensor_input import UnaryTensorInput
 from .op_spec import OpSpec
-from ...safe_ir import SpecType, TensorSpec, ScalarSpec
-from ....compute_stats import ComputeStats
 
 
 @dataclass
@@ -68,7 +68,9 @@ class SliceSpec(OpSpec):
         ]
 
         if len(real_indices) != len(set(real_indices)):
-            raise Exception(f"Concrete slice dimensions must be unique: {real_indices}.")
+            raise Exception(
+                f"Concrete slice dimensions must be unique: {real_indices}."
+            )
 
         real_indices_dict = {
             (idx if idx >= 0 else len(inputs[0].shape) + idx): sl
@@ -80,14 +82,20 @@ class SliceSpec(OpSpec):
         for i, size in enumerate(inputs[0].shape):
             if i in real_indices_dict:
                 raw_begin, raw_end = real_indices_dict[i]
-                begin = (raw_begin if raw_begin >= 0 else size + raw_begin)
-                end = (raw_end if raw_end >= 0 else size + raw_end)
+                begin = raw_begin if raw_begin >= 0 else size + raw_begin
+                end = raw_end if raw_end >= 0 else size + raw_end
                 if begin >= size:
-                    raise Exception(f"Begin index must smaller than the size of the dimension: dimension={i} size={size} begin={begin}")
+                    raise Exception(
+                        f"Begin index must smaller than the size of the dimension: dimension={i} size={size} begin={begin}"
+                    )
                 if end >= size:
-                    raise Exception(f"End index must smaller than the size of the dimension: dimension={i} size={size} end={end}")
+                    raise Exception(
+                        f"End index must smaller than the size of the dimension: dimension={i} size={size} end={end}"
+                    )
                 if begin >= end:
-                    raise Exception(f"Begin index must be before end index: dimension={i} begin={begin} end={end}")
+                    raise Exception(
+                        f"Begin index must be before end index: dimension={i} begin={begin} end={end}"
+                    )
                 out_shape.append(end - begin + 1)
                 seen[i] = True
             else:
@@ -97,7 +105,7 @@ class SliceSpec(OpSpec):
             raise Exception(f"shape not sufficient for slice spec: {inputs[0].shape}.")
 
         return TensorSpec(shape=out_shape, data_type=inputs[0].data_type)
-    
+
     def compute_stats(self, inputs: List[SpecType]) -> ComputeStats:
         out_spec = self.output_spec(inputs)
         return ComputeStats(

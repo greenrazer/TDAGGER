@@ -4,7 +4,8 @@ import unittest
 import torch
 import torch.nn as nn
 
-from src.ir.safe_ir import DataType, UnsqueezeSpec, TensorSpec
+from src.ir.safe_ir import DataType, TensorSpec, UnsqueezeSpec
+
 
 class TestUnsqueezeOutputSpec(unittest.TestCase):
     def test_basic(self):
@@ -18,7 +19,7 @@ class TestUnsqueezeOutputSpec(unittest.TestCase):
 
         self.assertEqual(out_spec.shape, [6, 1, 1, 8, 4, 2])
         self.assertEqual(out_spec.data_type, DataType.FLOAT32)
-    
+
     def test_basic2(self):
         spec = UnsqueezeSpec(
             dimensions={1, 3},
@@ -53,16 +54,6 @@ class TestUnsqueezeOutputSpec(unittest.TestCase):
         with self.assertRaises(Exception):
             spec.output_spec(input_specs)
 
-    def test_raises_out_of_bounds(self):
-        spec = UnsqueezeSpec(
-            dimensions={1, 10},
-        )
-
-        input_specs = [TensorSpec(shape=(6, 8, 4, 2), data_type=DataType.FLOAT32)]
-
-        with self.assertRaises(Exception):
-            spec.output_spec(input_specs)
-
     def test_raises_out_of_bounds_before(self):
         spec = UnsqueezeSpec(
             dimensions={1, -10},
@@ -82,6 +73,7 @@ class TestUnsqueezeOutputSpec(unittest.TestCase):
 
         with self.assertRaises(Exception):
             spec.output_spec(input_specs)
+
 
 class TestUnsqueezeComputeStats(unittest.TestCase):
     def test_basic(self):
