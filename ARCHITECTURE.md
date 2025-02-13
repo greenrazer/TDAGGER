@@ -7,6 +7,7 @@
 
 - It is hard to tell things about models automatically, like total_flops, memory_reads, memory_writes
 - It is hard to remove batch dimensions from models when needed.
+- 
 
 ## Goal
 
@@ -16,8 +17,6 @@
 - TDAGs input is a list of tensors
 - TDAGs output a list of tensors
 - Connect TDAGs via control flow only at the top level (conditional branching, dynamic-length loops, ...)
-- The top level can be thought of as a list of different traces each gated by a giant switch/match statement that decides whether 
-  to pass the ouput into the switch/match statement again or to ouptut it 
 
 ## Tensor Types
 
@@ -26,11 +25,17 @@
 - buffer: a non-learnable parameter that can change at runtime
 - const : a non-learnable parameter that cannot change at runtime
 
-## Op
+## Op IR
+
 - Each Op has inputs and a spec
 - inputs contain names of ops and tensors in the graph and are 
+- Einops are nice representations of tensor operations that generalize well to different platforms and frameworks
+  - Further reduce them to their simplist form
+  - Can be used to construct many other ops
 
-## Core Tensor Ops
+
+### Core Tensor Ops
+
 - permute
   - permute dimensions
   - "b c h w -> b h w c"
@@ -84,6 +89,8 @@
   - add, multiply
 - sign
 
+### Core Tensor Op Philosophy
+
 The nice thing about all these ops is that they all have inverses or pseudo inverses
 - reversible
   - permute <-> permute 
@@ -92,9 +99,9 @@ The nice thing about all these ops is that they all have inverses or pseudo inve
   - group <-> ungroup 
     - 0 1 2 3 -group(a b (c d))-> 0 1 a
     -  0 1 a -ungroup(a b (c d))-> 0 1 2 3
-  - squeeze <-> unsqueeze
-    -  0 1 2 3 -squeeze(a 1 b c 1 d)-> 0 (1) 2 3 (1) 5
-    -  0 (1) 2 3 (1) 5 -unsqueeze(a (1) b c (1) d)-> 0 1 2 3
+ - squeeze <-> unsqueeze
+   -  0 1 2 3 -squeeze(a 1 b c 1 d)-> 0 (1) 2 3 (1) 5
+   -  0 (1) 2 3 (1) 5 -unsqueeze(a (1) b c (1) d)-> 0 1 2 3
  -  unary ops
  -  binary ops
 - irreversible
@@ -111,7 +118,7 @@ The nice thing about all these ops is that they all have inverses or pseudo inve
     - 0 foldsize(1, 2, s)*k 2 3 ~unfold(a {b: k s} c d)~> 0 1 2 3 4
   - sign
 
-## Example Derived ops
+### Example Derived ops
 
 - Pow
   - Pow(A, B) = A^B = exp(log(A^B)) = exp(B*log(A))
@@ -128,7 +135,7 @@ The nice thing about all these ops is that they all have inverses or pseudo inve
   - unsqueeze
   - repeat
   - group
-- Einsum
+- Einsum (matmul, batched matmul)
   - for each input
     - unsqueeze: align missing axes
     - repeat: fill in missing axes from other input
@@ -163,7 +170,7 @@ The nice thing about all these ops is that they all have inverses or pseudo inve
 - Stack
   - input 1 unsqueeze
   - input 2 unsqueeze
-  - cat
+  - concat
 - Activation functions
   - relu
     - (x + abs(x))/2
@@ -176,8 +183,8 @@ The nice thing about all these ops is that they all have inverses or pseudo inve
 
 ## Controller Node
 
-Takes a list of tensors in and a state dict.
-returns a list of tensors and a state dict.
+- Takes a list of tensors in and a state dict.
+- returns a list of tensors and a state dict.
 
 ## Pipeline for inputs and outputs to/from IR
 

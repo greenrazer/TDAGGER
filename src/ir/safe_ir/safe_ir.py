@@ -12,7 +12,22 @@ class DataType(Enum):
     INT64 = auto()
     BOOL = auto()
     NONE = auto()
-    STRING = auto()
+
+    def size(self):
+        match self:
+            case DataType.FLOAT32:
+                return 4
+            case DataType.FLOAT64:
+                return 8
+            case DataType.INT32:
+                return 4
+            case DataType.INT64:
+                return 8
+            case DataType.BOOL:
+                return 1
+            case DataType.NONE:
+                return 1
+
 
 
 @dataclass
@@ -21,6 +36,9 @@ class ScalarSpec:
 
     def size(self):
         return 1
+    
+    def size_bytes(self):
+        self.size() * self.type.size()
 
 
 @dataclass
@@ -39,6 +57,9 @@ class TensorSpec:
         for s in self.shape:
             out *= s
         return out
+    
+    def size_bytes(self):
+        self.size() * self.data_type.size()
 
 @dataclass
 class TensorType:

@@ -1,8 +1,9 @@
 import torch
 
 from .converters.canonicalizers import TorchCanonicalizer
+from .converters.lowerers import TorchLowerer
 from .converters.reifiers import TorchReifier
-from .graph import DAGGraph, DAGGraphBuilder
+from .graph import DAGGraph, DAGGraphBuilder, Refiner
 
 
 class SafeDAG:
@@ -15,8 +16,15 @@ class SafeDAG:
         graph_builder = DAGGraphBuilder()
         canonicalizer.build_graph(graph_builder)
         graph = graph_builder.build()
-        return SafeDAG(graph)
+
+        refiner = Refiner()
+        refined_graph = refiner.refine(graph)
+
+        return SafeDAG(refined_graph)
 
     def to_torchscript(self) -> torch.nn.Module:
-        reifier = TorchReifier(self.graph)
+        lowerer = TorchLowerer()
+        out_graph = lowerer.lower(self.graph)
+        
+        reifier = TorchReifier(out_graph)
         return reifier.export()

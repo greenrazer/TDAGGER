@@ -1,11 +1,12 @@
 from enum import Enum, auto
-from typing import Dict, List
+from typing import Dict, List, Tuple
 
 from ..ir.safe_ir import (
     DataHolderType,
     OpType,
     SpecType,
 )
+from ..ir.compute_stats import ComputeStats
 
 
 class DataLocation(Enum):
@@ -34,6 +35,7 @@ class DAGGraph:
         self.outputs = outputs
 
         self.name_registry: Dict[str, DataLocation] = self._populate_name_registry()
+        self.op_output_shapes, self.op_compute_stats = self._propagate_input_specs()
 
     def _populate_name_registry(self):
         name_registry = {}
@@ -74,3 +76,46 @@ class DAGGraph:
 
     def __str__(self):
         return "\n".join([op.__str__() for op in self.ops.values()])
+    
+    def _propagate_input_specs(self) -> Tuple[Dict[str, List[int]], Dict[str, ComputeStats]]:
+        return {}, {}
+
+    def swap_input_specs(self, inputs: Dict[str, SpecType]):
+        self.inputs = inputs
+        self.op_output_shapes, self.op_compute_stats = self._propagate_input_specs()
+
+    def parameter_bytes(self) -> int:
+        total = 0
+        for p in self.parameters.values():
+            total += p.spec.size_bytes()
+        return total
+
+    def buffer_bytes(self) -> int:
+        total = 0
+        for b in self.buffers.values():
+            total += b.spec.size_bytes()
+        return total
+
+    def constant_bytes(self) -> int:
+        total = 0
+        for c in self.constants.values():
+            total += c.spec.size_bytes()
+        return total
+
+    def input_bytes(self) -> int:
+        total = 0
+        for i in self.inputs.values():
+            total += i.size_bytes()
+        return total
+    
+    def total_flops(self) -> int:
+        return 0
+
+    def total_memory_reads(self) -> int:
+        return 0
+
+    def total_memory_writes(self) -> int:
+        return 0
+    
+    def layers(self) -> List[List[OpType]]:
+        return []

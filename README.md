@@ -17,6 +17,15 @@ assert torch.allclose(self.traced_model(self.example_input), reconstructed_model
 
 ## Progress
 
+| Op | Status |
+|-------------|-----------|
+| torch -> IR     | 🟨        |
+| IR -> torch    | 🟨        |
+| flop counts      | 🟨        |
+| memory read counts      | 🟨        |
+| memory write counts      | 🟨        |
+| batch dimension removal     | ❌        |
+
 ### Tensor Ops
 
 | Op | Status |

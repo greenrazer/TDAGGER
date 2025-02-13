@@ -74,9 +74,6 @@ class TorchReifier(Reifier):
                     case DataType.FLOAT64:
                         const_node.output().setType(torch._C.FloatType.get())
                         const_node.f_("value", const.data)
-                    case DataType.STRING:
-                        const_node.output().setType(torch._C.StringType.get())
-                        const_node.s_("value", const.data)
                     case DataType.BOOL:
                         const_node.output().setType(torch._C.BoolType.get())
                         const_node.i_("value", int(const.data))
