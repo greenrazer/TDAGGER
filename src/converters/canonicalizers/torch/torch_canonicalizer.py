@@ -160,7 +160,7 @@ class TorchCanonicalizer(Canonicalizer):
                             data=node.f("value"),
                         )
                     case "StringType":
-                        pass # skipping for now
+                        pass  # skipping for now
                     case "BoolType":
                         constants[name] = ScalarType(
                             spec=ScalarSpec(type=DataType.BOOL),

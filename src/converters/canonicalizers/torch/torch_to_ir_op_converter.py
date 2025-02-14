@@ -30,7 +30,7 @@ from ....ir.safe_ir import (
     UnfoldSpec,
     UngroupSpec,
     UnsqueezeSpec,
-    SelectSpec
+    SelectSpec,
 )
 from ..canon_op_converter import CanonOpConverter
 from .group_helpers import specs_from_reshape
@@ -202,7 +202,13 @@ class TorchToIROpConverter(
         # I will ignore the alpha parameter beacuse it is not nessisary,
         # and if someone is using it they are doing something wrong
 
-        shapes = [context.name_to_spec[context.output_value_to_name[t]].shape if t in context.output_value_to_name else torch_op.inputsAt(i).type().sizes() for i, t in enumerate(torch_op.inputs()) if t.type().kind() == "TensorType"]
+        shapes = [
+            context.name_to_spec[context.output_value_to_name[t]].shape
+            if t in context.output_value_to_name
+            else torch_op.inputsAt(i).type().sizes()
+            for i, t in enumerate(torch_op.inputs())
+            if t.type().kind() == "TensorType"
+        ]
         shape_0 = shapes[0]
         shape_1 = shapes[1]
 
@@ -224,9 +230,9 @@ class TorchToIROpConverter(
                 shape_0,
                 input_names[1],
                 shape_1,
-                debug_sources=context.debug_sources
+                debug_sources=context.debug_sources,
             )
-                
+
             bin_op = OpType(
                 name=out_name,
                 input=BinaryTensorInput(in_names[0], in_names[1]),
@@ -299,7 +305,13 @@ class TorchToIROpConverter(
     ) -> Tuple[List[OpType], Dict[str, Union[ScalarType, TensorType]]]:
         out_name = torch_op.output().debugName().replace(".", "_")
 
-        shapes = [context.name_to_spec[context.output_value_to_name[t]].shape if t in context.output_value_to_name else torch_op.inputsAt(i).type().sizes() for i, t in enumerate(torch_op.inputs()) if t.type().kind() == "TensorType"]
+        shapes = [
+            context.name_to_spec[context.output_value_to_name[t]].shape
+            if t in context.output_value_to_name
+            else torch_op.inputsAt(i).type().sizes()
+            for i, t in enumerate(torch_op.inputs())
+            if t.type().kind() == "TensorType"
+        ]
         shape_0 = shapes[0]
         shape_1 = shapes[1]
 
@@ -318,7 +330,13 @@ class TorchToIROpConverter(
     ) -> Tuple[List[OpType], Dict[str, Union[ScalarType, TensorType]]]:
         out_name = torch_op.output().debugName().replace(".", "_")
 
-        shapes = [context.name_to_spec[context.output_value_to_name[t]].shape if t in context.output_value_to_name else torch_op.inputsAt(i).type().sizes() for i, t in enumerate(torch_op.inputs()) if t.type().kind() == "TensorType"]
+        shapes = [
+            context.name_to_spec[context.output_value_to_name[t]].shape
+            if t in context.output_value_to_name
+            else torch_op.inputsAt(i).type().sizes()
+            for i, t in enumerate(torch_op.inputs())
+            if t.type().kind() == "TensorType"
+        ]
         shape_0 = shapes[0]
         shape_1 = shapes[1]
 
@@ -370,7 +388,13 @@ class TorchToIROpConverter(
     ) -> Tuple[List[OpType], Dict[str, Union[ScalarType, TensorType]]]:
         out_name = torch_op.output().debugName().replace(".", "_")
 
-        shapes = [context.name_to_spec[context.output_value_to_name[t]].shape if t in context.output_value_to_name else torch_op.inputsAt(i).type().sizes() for i, t in enumerate(torch_op.inputs()) if t.type().kind() == "TensorType"]
+        shapes = [
+            context.name_to_spec[context.output_value_to_name[t]].shape
+            if t in context.output_value_to_name
+            else torch_op.inputsAt(i).type().sizes()
+            for i, t in enumerate(torch_op.inputs())
+            if t.type().kind() == "TensorType"
+        ]
 
         input_names = self._inputs_to_names(context, torch_op)
         return self._create_softplus(
@@ -419,9 +443,7 @@ class TorchToIROpConverter(
                 index_obj = (begin, end - 1)
 
         slice_op = OpType(
-            name=f"{out_name}_slice"
-            if input_constant_values[4] != 1
-            else out_name,
+            name=f"{out_name}_slice" if input_constant_values[4] != 1 else out_name,
             input=UnaryTensorInput(input_names[0]),
             spec=SliceSpec(slice={input_constant_values[1]: index_obj}),
             debug_sources=context.debug_sources,
@@ -432,7 +454,9 @@ class TorchToIROpConverter(
         if input_constant_values[4] != 1:
             input_shape = torch_op.inputsAt(0).type().sizes()
 
-            after_pad_amount = (-input_shape[input_constant_values[1]]) % input_constant_values[4]
+            after_pad_amount = (
+                -input_shape[input_constant_values[1]]
+            ) % input_constant_values[4]
 
             pad_op = OpType(
                 name=f"{out_name}_pad",
@@ -440,20 +464,28 @@ class TorchToIROpConverter(
                 spec=PadSpec(
                     pad={input_constant_values[1]: (0, after_pad_amount)},
                     pad_mode=0,
-                    _output_dims_sidecar=len(input_shape)
-                    ),
+                    _output_dims_sidecar=len(input_shape),
+                ),
                 debug_sources=context.debug_sources,
             )
             out.append(pad_op)
 
             ungroup_output_shape = input_shape.copy()
-            ungroup_output_shape[input_constant_values[1]:input_constant_values[1]+1] = [math.ceil(ungroup_output_shape[input_constant_values[1]]/input_constant_values[4]), input_constant_values[4]]
+            ungroup_output_shape[
+                input_constant_values[1] : input_constant_values[1] + 1
+            ] = [
+                math.ceil(
+                    ungroup_output_shape[input_constant_values[1]]
+                    / input_constant_values[4]
+                ),
+                input_constant_values[4],
+            ]
             ungroup_op = OpType(
                 name=f"{out_name}_ungroup",
                 input=UnaryTensorInput(pad_op.name),
                 spec=UngroupSpec(
                     ungroups={input_constant_values[1]: [-1, input_constant_values[4]]},
-                    _output_shape_sidecar=ungroup_output_shape
+                    _output_shape_sidecar=ungroup_output_shape,
                 ),
                 debug_sources=context.debug_sources,
             )
@@ -462,27 +494,27 @@ class TorchToIROpConverter(
             select_op = OpType(
                 name=f"{out_name}_select",
                 input=UnaryTensorInput(ungroup_op.name),
-                spec=SelectSpec(
-                    select={input_constant_values[1]+1: 0}
-                ),
+                spec=SelectSpec(select={input_constant_values[1] + 1: 0}),
                 debug_sources=context.debug_sources,
             )
             out.append(select_op)
 
             group_output_shape = input_shape.copy()
-            group_output_shape[input_constant_values[1]] = math.ceil(group_output_shape[input_constant_values[1]]/input_constant_values[4])
+            group_output_shape[input_constant_values[1]] = math.ceil(
+                group_output_shape[input_constant_values[1]] / input_constant_values[4]
+            )
             group_op = OpType(
                 name=out_name,
                 input=UnaryTensorInput(select_op.name),
                 spec=GroupSpec(
-                    groups=[[input_constant_values[1],input_constant_values[1]+1]],
-                    _output_shape_sidecar=group_output_shape
+                    groups=[[input_constant_values[1], input_constant_values[1] + 1]],
+                    _output_shape_sidecar=group_output_shape,
                 ),
                 debug_sources=context.debug_sources,
             )
             out.append(group_op)
         return out, {}
-    
+
     def _convert_select(
         self, context: ConversionContext, torch_op: torch._C.Node
     ) -> Tuple[List[OpType], Dict[str, Union[ScalarType, TensorType]]]:
@@ -494,7 +526,9 @@ class TorchToIROpConverter(
         select_op = OpType(
             name=f"{out_name}_select",
             input=UnaryTensorInput(input_names[0]),
-            spec=SelectSpec(select={input_constant_values[1]: input_constant_values[2]}),
+            spec=SelectSpec(
+                select={input_constant_values[1]: input_constant_values[2]}
+            ),
             debug_sources=context.debug_sources,
         )
 

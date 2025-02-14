@@ -35,7 +35,7 @@ UNARY_ELEMENTWISE_SPEC_TO_ATEN = {
 
 BINARY_ELEMENTWISE_SPEC_TO_ATEN = {
     f"binary_{BinaryElementwiseSpec.BinaryElementwiseType.ADD}": "aten::add",
-    f"binary_{BinaryElementwiseSpec.BinaryElementwiseType.MULTIPLY}": "aten::mul"
+    f"binary_{BinaryElementwiseSpec.BinaryElementwiseType.MULTIPLY}": "aten::mul",
 }
 
 REDUCE_SPEC_TO_ATEN = {
@@ -86,7 +86,7 @@ class IRToTorchOpConverter(OpConverter[ConversionContext, Callable, OpType, List
                 "unfold": self._convert_fold,
                 "squeeze": self._convert_squeeze,
                 "unsqueeze": self._convert_squeeze,
-                "repeat": self._convert_repeat
+                "repeat": self._convert_repeat,
             }
         )
 
@@ -155,7 +155,9 @@ class IRToTorchOpConverter(OpConverter[ConversionContext, Callable, OpType, List
             num_to_tensor_node = context.torch_graph.create("aten::scalar_tensor")
             num_to_tensor_node.addInput(input_val)
             # look at https://github.com/pytorch/pytorch/blob/main/c10/core/ScalarType.h
-            num_to_tensor_node.addInput(context.torch_graph.insertConstant(6)) # 6 = float32
+            num_to_tensor_node.addInput(
+                context.torch_graph.insertConstant(6)
+            )  # 6 = float32
             num_to_tensor_node.addInput(context.torch_graph.insertConstant(None))
             num_to_tensor_node.addInput(context.torch_graph.insertConstant(None))
             num_to_tensor_node.addInput(context.torch_graph.insertConstant(None))
@@ -247,9 +249,7 @@ class IRToTorchOpConverter(OpConverter[ConversionContext, Callable, OpType, List
             node.addInput(context.torch_graph.insertConstant(curr_val[0]))
             # from inclusive to exclusive end
             if curr_val[1] == -1:  # if to end of list replace with 2^63 - 1
-                node.addInput(
-                    context.torch_graph.insertConstant(9223372036854775807)
-                )
+                node.addInput(context.torch_graph.insertConstant(9223372036854775807))
             else:
                 node.addInput(context.torch_graph.insertConstant(curr_val[1] + 1))
             node.addInput(context.torch_graph.insertConstant(1))
@@ -292,7 +292,7 @@ class IRToTorchOpConverter(OpConverter[ConversionContext, Callable, OpType, List
             last_inp = unsqueeze_node.output()
 
         return nodes
-    
+
     def _convert_group(
         self, context: ConversionContext, op: OpType
     ) -> List[torch._C.Node]:
@@ -358,12 +358,8 @@ class IRToTorchOpConverter(OpConverter[ConversionContext, Callable, OpType, List
 
         key_0 = 0 + len(op.spec._output_shape_sidecar) - 2
         key_1 = 1 + len(op.spec._output_shape_sidecar) - 2
-        kernel_h, stride_h = (
-            fold_dict[key_0] if key_0 in fold_dict else (0, 0)
-        )
-        kernel_w, stride_w = (
-            fold_dict[key_1] if key_1 in fold_dict else (0, 0)
-        )
+        kernel_h, stride_h = fold_dict[key_0] if key_0 in fold_dict else (0, 0)
+        kernel_w, stride_w = fold_dict[key_1] if key_1 in fold_dict else (0, 0)
         kernel = [kernel_h, kernel_w]
         stride = [stride_h, stride_w]
         dilation = [1, 1]
@@ -411,7 +407,7 @@ class IRToTorchOpConverter(OpConverter[ConversionContext, Callable, OpType, List
         self, context: ConversionContext, op: OpType
     ) -> List[torch._C.Node]:
         input_val = context.name_to_output_value[op.input.input]
-    
+
         node = context.torch_graph.create("aten::repeat")
 
         repeat_list = []
@@ -422,8 +418,6 @@ class IRToTorchOpConverter(OpConverter[ConversionContext, Callable, OpType, List
                 repeat_list.append(1)
 
         node.addInput(input_val)
-        node.addInput(
-            context.torch_graph.insertConstant(repeat_list)
-        )
+        node.addInput(context.torch_graph.insertConstant(repeat_list))
 
         return [node]

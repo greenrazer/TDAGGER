@@ -81,7 +81,7 @@ class DAGGraph:
 
     def __str__(self):
         return "\n".join([op.__str__() for op in self.ops.values()])
-    
+
     def _seperate_layers(self) -> List[List[str]]:
         def unprocessed_ops(ops, processed):
             unprocessed = []
@@ -98,15 +98,18 @@ class DAGGraph:
                     processable.append(op)
 
             return processable
-        
+
         def layer_index_for_op(op, name_to_layer):
             max_input_layer = 0
             for op_input in op.input.unique_indices:
                 max_input_layer = max(max_input_layer, name_to_layer[op_input])
             return max_input_layer + 1
-        
 
-        name_to_layer = {name: -1 for name, location in self.name_registry.items() if location != DataLocation.OP}
+        name_to_layer = {
+            name: -1
+            for name, location in self.name_registry.items()
+            if location != DataLocation.OP
+        }
         processed = {name for name in name_to_layer}
         while unprocessed := unprocessed_ops(self.ops, processed):
             processable = processable_ops(unprocessed, processed)
@@ -129,8 +132,10 @@ class DAGGraph:
                 out.append(layer_to_names[layer])
 
         return out
-    
-    def _propagate_input_specs(self) -> Tuple[Dict[str, SpecType], Dict[str, ComputeStats]]:
+
+    def _propagate_input_specs(
+        self,
+    ) -> Tuple[Dict[str, SpecType], Dict[str, ComputeStats]]:
         output_specs = {}
         compute_stats = {}
         for layer in self.layers:
@@ -182,10 +187,10 @@ class DAGGraph:
         for i in self.inputs.values():
             total += i.size_bytes()
         return total
-    
+
     def total_bytes(self) -> int:
         return self.parameter_bytes() + self.buffer_bytes() + self.constant_bytes()
-    
+
     def total_flops(self) -> int:
         total = 0
         for cs in self.op_compute_stats.values():
