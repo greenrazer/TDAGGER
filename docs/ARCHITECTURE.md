@@ -9,8 +9,21 @@
 - It is hard to remove batch dimensions from models when needed
 - Most IRs are made for performance versus portability
 
-The vast majority of neural networks are just Tensor Directed Acyclic Graphs (TDAGs) with 
+The vast majority of neural networks are (or can be reduced to) Tensor Directed Acyclic Graphs (TDAGs) with 
 control flow (conditional branching, dynamic-length loops, dynamic shapes...) only at the top level.
+
+For Example:
+- Decoder-Only Transformers
+  - A central TDAG that takes in embeddings(or one-hot vectors), and a attention mask
+  - outputs logits (or a probability distribution over a vocabulary)
+  - Has a top level while loop that checks for an end token or a max number of iterations
+- BERT-style Transformers
+  - An encoder TDAG that takes in embeddings, and a decoder TDAG that takes in the encoder output, embeddings, and attention mask
+  - the encoder and decoder TDAG otuput embeddings.
+  - Runs the encoder once, and has a top level while loop for the decoder.
+- Vision Networks
+  - Generally a backbone TDAG that takes in an image, and a prediction head TDAG that outputs something (classification, segmentation, etc...)
+  - Usually doesn't need any top-level control flow
 
 ## Goal
 

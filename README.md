@@ -9,6 +9,7 @@ Transforming neural networks into portable, analyzable tensor graphs.
 
 Working with neural network architectures across different frameworks and platforms presents several challenges:
 - Analyzing model characteristics (FLOPs, memory usage) is often difficult and framework-specific.
+- Extracting subgraphs for reuse is often challenging due to complicated model architectures and lack of standardized tools.
 - Removing batch dimensions and other model transformations can be hard, and usually involves changing the base model code directly.
 - Existing intermediate representations (IRs) typically prioritize performance over portability.
 
