@@ -23,7 +23,7 @@ assert torch.allclose(traced_model(example_input), reconstructed_model(example_i
 
 ## Progress
 
-| Op | Status |
+| Part | Status |
 |-------------|-----------|
 | torch -> IR     | 🟨        |
 | IR -> torch    | 🟨        |
