@@ -25,7 +25,7 @@ class SqueezeModule(nn.Module):
 class TestTorchSqueeze(unittest.TestCase):
     def setUp(self):
         self.model = SqueezeModule()
-        self.example_input = torch.rand((4, 1, 32, 1))
+        self.example_input = torch.rand((1, 4, 1, 32))
 
         self.traced_model = torch.jit.trace(self.model, self.example_input)
         self.safe_dag = SafeDAG.from_torchscript(self.traced_model)

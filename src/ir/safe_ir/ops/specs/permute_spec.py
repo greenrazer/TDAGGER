@@ -64,8 +64,8 @@ class PermuteSpec(OpSpec):
             raise Exception(f"Concrete pad dimensions must be unique: {real_indices}.")
 
         real_indices_dict = {
-            (idx2 if idx2 >= 0 else len(inputs[0].shape) + idx2): (
-                idx if idx >= 0 else len(inputs[0].shape) + idx
+            (idx if idx >= 0 else len(inputs[0].shape) + idx): (
+                idx2 if idx2 >= 0 else len(inputs[0].shape) + idx2
             )
             for idx, idx2 in self.permutation.items()
         }

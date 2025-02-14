@@ -64,7 +64,7 @@ class GroupSpec(OpSpec):
         for group in [lst for lst in self.groups if lst and lst[0] >= 0]:
             if group[0] != last_dim + 1:
                 out.append("...")
-            out.append(f"({' '.join(group)})")
+            out.append(f"({' '.join([str(g) for g in group])})")
             last_dim = group[-1]
         out.append("...")
 
@@ -106,12 +106,16 @@ class GroupSpec(OpSpec):
         out_shape = []
         curr_group = 0
         for i, size in enumerate(inputs[0].shape):
-            if i == groups_real_indexes[curr_group][0]:
+            if curr_group >= len(groups_real_indexes):
                 out_shape.append(size)
-                seen[i] = True
             elif i == groups_real_indexes[curr_group][-1]:
+                if len(out_shape) == 0:
+                    out_shape.append(1)
                 out_shape[-1] *= size
                 curr_group += 1
+                seen[i] = True
+            elif i == groups_real_indexes[curr_group][0]:
+                out_shape.append(size)
                 seen[i] = True
             elif i in groups_real_indexes[curr_group]:
                 out_shape[-1] *= size

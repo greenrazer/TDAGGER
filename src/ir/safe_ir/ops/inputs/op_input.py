@@ -8,16 +8,18 @@ class OpInput(ABC):
 
     def __init__(self, inputs: Dict[str, Union[str, List[str]]]):
         self.inputs = inputs
-        self.unique_indices = set()
-        self._process_inputs()
+        self.flattened_indices = self._flatten_inputs()
+        self.unique_indices = set(self.flattened_indices)
 
-    def _process_inputs(self):
+    def _flatten_inputs(self):
+        flattened = []
         for _, val in self.inputs.items():
             if isinstance(val, list):
                 for index in val:
-                    self.unique_indices.add(index)
+                    flattened.append(index)
             elif isinstance(val, str):
                 index = val
-                self.unique_indices.add(index)
+                flattened.append(index)
             else:
                 raise Exception("inputs can only be a reference or list of references")
+        return flattened

@@ -92,7 +92,7 @@ class SliceSpec(OpSpec):
                     raise Exception(
                         f"End index must smaller than the size of the dimension: dimension={i} size={size} end={end}"
                     )
-                if begin >= end:
+                if begin > end:
                     raise Exception(
                         f"Begin index must be before end index: dimension={i} begin={begin} end={end}"
                     )

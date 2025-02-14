@@ -30,7 +30,7 @@ class TestPermuteOutputSpec(unittest.TestCase):
 
         out_spec = spec.output_spec(input_specs)
 
-        self.assertEqual(out_spec.shape, [1, 4, 2, 3])
+        self.assertEqual(out_spec.shape, [1, 3, 4, 2])
         self.assertEqual(out_spec.data_type, DataType.FLOAT32)
 
     def test_negitive_dimensions(self):
@@ -40,7 +40,7 @@ class TestPermuteOutputSpec(unittest.TestCase):
 
         out_spec = spec.output_spec(input_specs)
 
-        self.assertEqual(out_spec.shape, [1, 4, 2, 3])
+        self.assertEqual(out_spec.shape, [1, 3, 4, 2])
         self.assertEqual(out_spec.data_type, DataType.FLOAT32)
 
     def test_raises_on_negitive_overlap(self):

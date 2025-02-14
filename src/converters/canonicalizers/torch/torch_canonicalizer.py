@@ -124,7 +124,7 @@ class TorchCanonicalizer(Canonicalizer):
                     pass
                 case "TensorType":
                     inputs[name] = TensorSpec(
-                        shape=tuple(input_type.sizes()),
+                        shape=list(input_type.sizes()),
                         data_type=DataType.from_torch(input_type.dtype()),
                     )
                 case _:
@@ -142,7 +142,7 @@ class TorchCanonicalizer(Canonicalizer):
                     case "TensorType":
                         constants[name] = TensorType(
                             spec=TensorSpec(
-                                shape=tuple(node.output().type().sizes()),
+                                shape=list(node.output().type().sizes()),
                                 data_type=DataType.from_torch(
                                     node.output().type().dtype()
                                 ),
@@ -209,7 +209,7 @@ class TorchCanonicalizer(Canonicalizer):
                         tensor = self.state_dict[attr_name].data
                         parameters[clean_name] = TensorType(
                             spec=TensorSpec(
-                                shape=tuple(tensor.shape),
+                                shape=list(tensor.shape),
                                 data_type=DataType.from_torch(tensor.dtype),
                             ),
                             data=tensor.numpy(),
@@ -240,7 +240,7 @@ class TorchCanonicalizer(Canonicalizer):
                         tensor = self.state_dict[attr_name].data
                         buffers[clean_name] = TensorType(
                             spec=TensorSpec(
-                                shape=tuple(tensor.shape),
+                                shape=list(tensor.shape),
                                 data_type=DataType.from_torch(tensor.dtype),
                             ),
                             data=tensor.numpy(),
@@ -272,16 +272,21 @@ class TorchCanonicalizer(Canonicalizer):
         )
 
     def build_graph(self, graph_builder: DAGGraphBuilder):
+        name_to_spec = {}
         for name, value in self._retrieve_inputs().items():
+            name_to_spec[name] = value
             graph_builder.add_input(name, value)
 
         for name, value in self._retrieve_constants().items():
+            name_to_spec[name] = value.spec
             graph_builder.add_constant(name, value)
 
         for name, value in self._retrieve_parameters().items():
+            name_to_spec[name] = value.spec
             graph_builder.add_parameter(name, value)
 
         for name, value in self._retrieve_buffers().items():
+            name_to_spec[name] = value.spec
             graph_builder.add_buffer(name, value)
 
         nodes_to_process = {
@@ -320,6 +325,7 @@ class TorchCanonicalizer(Canonicalizer):
                     self.forward_graph,
                     self.output_value_to_node,
                     self.output_value_to_name,
+                    name_to_spec,
                     debug_source,
                 )
                 for const_name, const in consts.items():

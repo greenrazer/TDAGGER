@@ -358,15 +358,15 @@ class IRToTorchOpConverter(OpConverter[ConversionContext, Callable, OpType, List
 
         key_0 = 0 + len(op.spec._output_shape_sidecar) - 2
         key_1 = 1 + len(op.spec._output_shape_sidecar) - 2
-        kernel_h, stride_h, dilation_h = (
-            fold_dict[key_0] if key_0 in fold_dict else (0, 0, 0)
+        kernel_h, stride_h = (
+            fold_dict[key_0] if key_0 in fold_dict else (0, 0)
         )
-        kernel_w, stride_w, dilation_w = (
-            fold_dict[key_1] if key_1 in fold_dict else (0, 0, 0)
+        kernel_w, stride_w = (
+            fold_dict[key_1] if key_1 in fold_dict else (0, 0)
         )
         kernel = [kernel_h, kernel_w]
         stride = [stride_h, stride_w]
-        dilation = [dilation_h, dilation_w]
+        dilation = [1, 1]
 
         node.addInput(context.torch_graph.insertConstant(kernel))
         node.addInput(context.torch_graph.insertConstant(dilation))

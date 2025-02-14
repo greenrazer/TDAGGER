@@ -24,7 +24,7 @@ class SqueezeSpec(OpSpec):
     def format_input(self, input: UnaryTensorInput) -> str:
         return f"{self.type}[{self._op_string()}](%{input.input})"
 
-    def __str__(self):
+    def _op_string(self):
         out = []
         last_dim = -1
         for d in sorted([d for d in self.dimensions if d >= 0]):

@@ -30,14 +30,14 @@ class RepeatSpec(OpSpec):
     def _op_string(self) -> str:
         out = []
         last_dim = -1
-        for d in sorted([d for d in self.reduce_dimensions if d >= 0]):
+        for d in sorted([d for d in self.repeat if d >= 0]):
             if d != last_dim + 1:
                 out.append("...")
             n = self.repeat[d]
             out.append(f"{{{d}: times={n}}}")
             last_dim = d
         out.append("...")
-        neg_dims = sorted([d for d in self.reduce_dimensions if d < 0])
+        neg_dims = sorted([d for d in self.repeat if d < 0])
         if len(neg_dims) > 0:
             last_dim = neg_dims[0] - 1
             for d in neg_dims:
