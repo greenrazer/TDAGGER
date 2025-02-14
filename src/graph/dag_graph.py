@@ -183,11 +183,23 @@ class DAGGraph:
             total += i.size_bytes()
         return total
     
+    def total_bytes(self) -> int:
+        return self.parameter_bytes() + self.buffer_bytes() + self.constant_bytes()
+    
     def total_flops(self) -> int:
-        return 0
+        total = 0
+        for cs in self.op_compute_stats.values():
+            total += cs.flops
+        return total
 
     def total_memory_reads(self) -> int:
-        return 0
+        total = 0
+        for cs in self.op_compute_stats.values():
+            total += cs.reads
+        return total
 
     def total_memory_writes(self) -> int:
-        return 0
+        total = 0
+        for cs in self.op_compute_stats.values():
+            total += cs.writes
+        return total

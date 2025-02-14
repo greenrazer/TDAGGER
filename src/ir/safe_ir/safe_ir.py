@@ -34,11 +34,11 @@ class DataType(Enum):
 class ScalarSpec:
     type: DataType
 
-    def size(self):
+    def size(self) -> int:
         return 1
     
-    def size_bytes(self):
-        self.size() * self.type.size()
+    def size_bytes(self) -> int:
+        return self.size() * self.type.size()
 
 
 @dataclass
@@ -52,14 +52,14 @@ class TensorSpec:
     shape: Tuple[int, ...]
     data_type: DataType
 
-    def size(self):
+    def size(self) -> int:
         out = 1
         for s in self.shape:
             out *= s
         return out
     
-    def size_bytes(self):
-        self.size() * self.data_type.size()
+    def size_bytes(self) -> int:
+        return self.size() * self.data_type.size()
 
 @dataclass
 class TensorType:
