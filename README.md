@@ -1,7 +1,26 @@
 # SafeGraph
 
+Transforming neural networks into portable, analyzable tensor graphs.
+
 > [!WARNING]
-> This is a work in progress
+> This is an early work in progress.
+
+## Why This Exists
+
+Working with neural network architectures across different frameworks and platforms presents several challenges:
+- Analyzing model characteristics (FLOPs, memory usage) is often difficult and framework-specific
+- Removing batch dimensions and other model transformations can be hard, and usually involves changing the base model code directly.
+- Existing intermediate representations (IRs) typically prioritize performance over portability.
+
+This framework takes a different approach by decomposing neural networks into their fundamental building blocks: Tensor Directed Acyclic Graphs (TDAGs) with clean, top-level control flow.
+
+## Key Features
+
+- **Simple Core Operations**: Reduces complex neural operations to a minimal set of tensor operations based off [einops](https://github.com/arogozhnikov/einops).
+- **Framework Agnostic**: Design focuses on portability rather than framework-specific optimizations
+- **Easy Analysis**: Clear graph structure makes it simpler to analyze model characteristics
+- **Modular Architecture**: Split models into independent Tensor Directed Acyclic Graphs(TDAGs) that can be easily reused and modified
+- **Clean Control Flow**: Handles branching and dynamic behavior at the top level, keeping tensor operations pure
 
 ## Example
 
@@ -30,7 +49,12 @@ assert torch.allclose(traced_model(example_input), reconstructed_model(example_i
 | flop counts      | 🟨        |
 | memory read counts      | 🟨        |
 | memory write counts      | 🟨        |
+| Shape Propagation   | 🟨        |
+| Serialization/Deserialization    | ❌        |
 | batch dimension removal     | ❌        |
+| CoreML -> IR     | ❌        |
+| IR -> CoreML    | ❌        |
+| Control Flow     | ❌        |
 
 ### Tensor Ops
 

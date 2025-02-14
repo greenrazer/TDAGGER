@@ -1,31 +1,38 @@
 # Architecture
 
 > [!WARNING]
-> This is a work in progress
+> This is an early work in progress.
 
-## Problems
+## Overview
 
 - It is hard to tell things about models automatically, like total_flops, memory_reads, memory_writes
 - It is hard to remove batch dimensions from models when needed.
-- 
+- Most IRs are made for performance vs portability
+
+The vast majority of neural networks are just Tensor Directed Acyclic Graphs(TDAGs) with 
+control flow (conditional branching, dynamic-length loops, dynamic shapes ...) only at the top level.
 
 ## Goal
 
-- Split the model into a series of Tensor Directed Acyclic Graphs(TDAGs)(no conditional branching, dynamic-length loops, ...)
+- Split the model into a series of TDAGs
 - TDAGs have very few core operations
 - Each TDAG can be thought of as a "jit.trace" of a neural network.
 - TDAGs input is a list of tensors
 - TDAGs output a list of tensors
-- Connect TDAGs via control flow only at the top level (conditional branching, dynamic-length loops, ...)
+- Connect TDAGs via control flow only at the top level.
+- Enable developers to extract TDAGs for reuse in other applications easily.
+- Enable easy graph modification.
 
-## Tensor Types
+## Implementation
+
+### Tensor Types
 
 - input: defined at runtime
 - parameter: learnable parameter
 - buffer: a non-learnable parameter that can change at runtime
 - const : a non-learnable parameter that cannot change at runtime
 
-## Op IR
+### Op IR
 
 - Each Op has inputs and a spec
 - inputs contain names of ops and tensors in the graph and are 
@@ -34,7 +41,7 @@
   - Can be used to construct many other ops
 
 
-### Core Tensor Ops
+#### Core Tensor Ops
 
 - permute
   - permute dimensions
@@ -89,7 +96,7 @@
   - add, multiply
 - sign
 
-### Core Tensor Op Philosophy
+#### Core Tensor Op Philosophy
 
 The nice thing about all these ops is that they all have inverses or pseudo inverses
 - reversible
@@ -118,7 +125,7 @@ The nice thing about all these ops is that they all have inverses or pseudo inve
     - 0 foldsize(1, 2, s)*k 2 3 ~unfold(a {b: k s} c d)~> 0 1 2 3 4
   - sign
 
-### Example Derived ops
+#### Example Derived ops
 
 - Pow
   - Pow(A, B) = A^B = exp(log(A^B)) = exp(B*log(A))
@@ -181,12 +188,12 @@ The nice thing about all these ops is that they all have inverses or pseudo inve
   - sigmoid
     - 1/(1+exp(-x))
 
-## Controller Node
+### Controller Node
 
 - Takes a list of tensors in and a state dict.
 - returns a list of tensors and a state dict.
 
-## Pipeline for inputs and outputs to/from IR
+### Pipeline for inputs and outputs to/from IR
 
 - from_
   - Cannonicalizer (1 pass)
