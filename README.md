@@ -8,7 +8,7 @@ Transforming neural networks into portable, analyzable tensor graphs.
 ## Why This Exists
 
 Working with neural network architectures across different frameworks and platforms presents several challenges:
-- Analyzing model characteristics (FLOPs, memory usage) is often difficult and framework-specific
+- Analyzing model characteristics (FLOPs, memory usage) is often difficult and framework-specific.
 - Removing batch dimensions and other model transformations can be hard, and usually involves changing the base model code directly.
 - Existing intermediate representations (IRs) typically prioritize performance over portability.
 
@@ -16,11 +16,11 @@ This framework takes a different approach by decomposing neural networks into th
 
 ## Key Features
 
-- **Simple Core Operations**: Reduces complex neural operations to a minimal set of tensor operations based off [einops](https://github.com/arogozhnikov/einops).
-- **Framework Agnostic**: Design focuses on portability rather than framework-specific optimizations
-- **Easy Analysis**: Clear graph structure makes it simpler to analyze model characteristics
-- **Modular Architecture**: Split models into independent Tensor Directed Acyclic Graphs(TDAGs) that can be easily reused and modified
-- **Clean Control Flow**: Handles branching and dynamic behavior at the top level, keeping tensor operations pure
+- **Framework Agnostic**: Design focuses on portability rather than framework-specific optimizations.
+- **Simple Core Operations**: Reduces complex neural operations to a minimal set of portable tensor operations.
+- **Easy Analysis**: Clear graph structure makes it simpler to analyze model characteristics.
+- **Modular Architecture**: Split models into independent Tensor Directed Acyclic Graphs(TDAGs) that can be easily reused and modified.
+- **Clean Control Flow**: Handles branching and dynamic behavior at the top level, keeping tensor operations pure.
 
 ## Example
 
@@ -70,13 +70,13 @@ reconstructed_model = safe_dag.to_torchscript()
 assert torch.allclose(traced_model(example_input), reconstructed_model(example_input))
 ```
 
-## Architecture
-
-[Architecture](docs/ARCHITECTURE.md)
-
 ## Deinop Overview
 
 [Deinops](docs/DEINOPS.md)
+
+## Architecture
+
+[Architecture](docs/ARCHITECTURE.md)
 
 ## Progress
 
