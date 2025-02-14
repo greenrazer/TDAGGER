@@ -25,7 +25,7 @@ For Example:
   - Generally a backbone TDAG that takes in an image, and a prediction head TDAG that outputs something (classification, segmentation, etc...)
   - Usually doesn't need any top-level control flow
 
-## Goal
+## Goals
 
 - Split the model into a series of TDAGs
 - TDAGs have very few core operations
