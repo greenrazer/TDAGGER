@@ -6,7 +6,7 @@ Deconstructed Einstein Operators
 
 [Einsum](https://numpy.org/doc/2.1/reference/generated/numpy.einsum.html) -> [Einops](https://github.com/arogozhnikov/einops) (rearrange, reduce, repeat)
 
-[Einops](https://github.com/arogozhnikov/einops) -> Deinops (permute, group, ungroup, fold, unfold, reduce, repeat)
+[Einops](https://github.com/arogozhnikov/einops) -> Deinops (permute, group(squeeze), ungroup(unsqueeze), reduce(select), repeat, slice, pad, fold, unfold)
 
 ## Visualizations
 

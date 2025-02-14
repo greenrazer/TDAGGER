@@ -87,18 +87,10 @@ control flow (conditional branching, dynamic-length loops, dynamic shapes ...) o
 - unfold
   - n c {h: a 3} {w: b 3} -> n c h*a w*b
   - sort of `x = F.unfold(pad(x), kernel_size=(a, b), stride=3, dilation=0, padding=0)`
-- unary ops
-    - neg, reciprocal
-    - exp, log
-    - sin, arcsin, cos, arccos, tan, arctan, sinh, arcsinh, cosh, arccosh, tanh, arctanh
-    - gaussian, inv_gaussian
-- binary ops
-  - add, multiply
-- sign
 
 #### Deinop Philosophy
 
-The nice thing about all these ops is that they are mostly reversible.
+The nice thing about all these ops is that they have a nice symmetry.
 - reversible
   - permute <-> permute 
     - 0 1 2 3 -permute(2 3 0 1)-> 2 3 0 1
@@ -109,9 +101,7 @@ The nice thing about all these ops is that they are mostly reversible.
  - squeeze <-> unsqueeze
    -  0 1 2 3 -squeeze(a 1 b c 1 d)-> 0 (1) 2 3 (1) 5
    -  0 (1) 2 3 (1) 5 -unsqueeze(a (1) b c (1) d)-> 0 1 2 3
- -  unary ops
- -  binary ops
-- pseudo-reversible
+- irreversible
   - slice <~> pad 
     - x -slice[0, 1:-1, 3:]-> x[0, 1:-1, 3:]
     - x[0, 1:-1, 3:] ~pad[0, 1:-1, 3:]~> x
@@ -123,7 +113,16 @@ The nice thing about all these ops is that they are mostly reversible.
     - `unfoldsize(dim_size, kernet_size, stride) = (dim_size - 1)/stride + 1`
     - 0 1 2 3 4 -fold(a {b: k s} c d | sum)-> 0 foldsize(1, 2, s)*k 2 3
     - 0 foldsize(1, 2, s)*k 2 3 ~unfold(a {b: k s} c d)~> 0 1 2 3 4
-  - sign
+
+#### Other Tensor Ops
+- unary ops
+    - neg, reciprocal
+    - exp, log
+    - sin, arcsin, cos, arccos, tan, arctan, sinh, arcsinh, cosh, arccosh, tanh, arctanh
+    - gaussian, inv_gaussian
+- binary ops
+  - add, multiply
+- sign
 
 #### Example Derived ops
 
