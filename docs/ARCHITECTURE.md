@@ -41,7 +41,7 @@ control flow (conditional branching, dynamic-length loops, dynamic shapes ...) o
   - Can be used to construct many other ops
 
 
-#### Core Tensor Ops
+#### Deconstructed Einops (Deinops)
 
 - permute
   - permute dimensions
@@ -96,9 +96,9 @@ control flow (conditional branching, dynamic-length loops, dynamic shapes ...) o
   - add, multiply
 - sign
 
-#### Core Tensor Op Philosophy
+#### Deinop Philosophy
 
-The nice thing about all these ops is that they all have inverses or pseudo inverses
+The nice thing about all these ops is that they are mostly reversible.
 - reversible
   - permute <-> permute 
     - 0 1 2 3 -permute(2 3 0 1)-> 2 3 0 1
@@ -111,7 +111,7 @@ The nice thing about all these ops is that they all have inverses or pseudo inve
    -  0 (1) 2 3 (1) 5 -unsqueeze(a (1) b c (1) d)-> 0 1 2 3
  -  unary ops
  -  binary ops
-- irreversible
+- pseudo-reversible
   - slice <~> pad 
     - x -slice[0, 1:-1, 3:]-> x[0, 1:-1, 3:]
     - x[0, 1:-1, 3:] ~pad[0, 1:-1, 3:]~> x

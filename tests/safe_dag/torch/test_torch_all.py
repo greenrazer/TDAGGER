@@ -19,6 +19,7 @@ class All(nn.Module):
         x = x - self.my_buffer
         x = x * self.my_buffer
         x = x / self.my_buffer
+        # TODO re-add dialation
         x = F.unfold(x, kernel_size=(2, 2), stride=3, dilation=1, padding=1)
         x = F.fold(
             x, output_size=(30, 48), kernel_size=(2, 2), stride=3, dilation=1, padding=1

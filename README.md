@@ -25,8 +25,38 @@ This framework takes a different approach by decomposing neural networks into th
 ## Example
 
 ```
+class Model(nn.Module):
+    def __init__(self):
+        super().__init__()
+
+        self.to_add = torch.nn.Parameter(torch.ones(1, dtype=torch.float32))
+        self.register_buffer("my_buffer", torch.ones(48) * 3)
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        x = x + self.to_add + self.my_buffer
+        x = x - self.my_buffer
+        x = x * self.my_buffer
+        x = x / self.my_buffer
+        x = F.unfold(x, kernel_size=(2, 2), stride=3, dilation=1, padding=1)
+        x = F.fold(
+            x, output_size=(30, 48), kernel_size=(2, 2), stride=3, dilation=1, padding=1
+        )
+        x = x[:, :10, 10:, 10:-10]
+        x = torch.nn.functional.pad(x, (1, 1, 2, 0, 0, 2, 1, 1))
+        x = x.permute(1, 2, 3, 0)
+        x = torch.sum(x, dim=(0, -1))
+        x = x.reshape(2, 11, 15, 2)
+        x = x.unsqueeze(0)
+        x = x.squeeze(0)
+        x = -x
+        x = torch.abs(x)
+        x = torch.sin(x)
+        x = torch.nn.functional.leaky_relu(x)
+
+        return x
+
 model = Model()
-example_input = torch.rand((10, 20, 30, 40))
+example_input = torch.rand((10, 20, 30, 48))
 
 traced_model = torch.jit.trace(model, example_input)
 safe_dag = SafeDAG.from_torchscript(traced_model)
@@ -39,6 +69,14 @@ print(safe_dag.graph.total_memory_writes())
 reconstructed_model = safe_dag.to_torchscript()
 assert torch.allclose(traced_model(example_input), reconstructed_model(example_input))
 ```
+
+## Architecture
+
+[Architecture](docs/ARCHITECTURE.md)
+
+## Deinop Overview
+
+[Deinops](docs/DEINOPS.md)
 
 ## Progress
 
@@ -129,7 +167,3 @@ assert torch.allclose(traced_model(example_input), reconstructed_model(example_i
 | Transpose Convolution | ❌ |
 | Concat | ❌ |
 | Stack | ❌ |
-
-## Architecture
-
-[architecture](ARCHITECTURE.md)
