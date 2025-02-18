@@ -132,8 +132,8 @@ assert torch.allclose(traced_model(example_input), reconstructed_model(example_i
 | arccosh     | ✅        |
 | tanh        | ✅        |
 | arctanh     | ✅        |
-| gaussian    | ✅        |
-| inv_gaussian | ✅       |
+| gaussian    | ❌        |
+| inv_gaussian | ❌       |
 | sign        | ✅        |
 
 ### Binary Ops
@@ -142,7 +142,6 @@ assert torch.allclose(traced_model(example_input), reconstructed_model(example_i
 |-------------|-----------|
 | add         | ✅        |
 | multiply    | ✅        |
-| exponentiate | ❌       |
 
 ### Derived Unary Ops
 
@@ -163,6 +162,7 @@ assert torch.allclose(traced_model(example_input), reconstructed_model(example_i
 
 |  Op  | Supported |
 |-------------|-----------|
+| Exponentiate | ❌       |
 | Einsum      | ❌        |
 | Convolution | ❌        |
 | Transpose Convolution | ❌ |
