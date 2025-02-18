@@ -3,7 +3,7 @@ import unittest
 import torch
 import torch.nn as nn
 
-from src.safe_dag import SafeDAG
+from src.tensor_dag import TensorDAG
 
 
 class SimplePermute(nn.Module):
@@ -26,10 +26,10 @@ class TestTorchPermute(unittest.TestCase):
         self.example_input = torch.rand((2, 32, 32, 3))
 
         self.traced_model = torch.jit.trace(self.model, self.example_input)
-        self.safe_dag = SafeDAG.from_torchscript(self.traced_model)
+        self.tdag = TensorDAG.from_torchscript(self.traced_model)
 
     def test_reconstructed_output(self):
-        out_model = self.safe_dag.to_torchscript()
+        out_model = self.tdag.to_torchscript()
         original_output = self.traced_model(self.example_input)
         reconstructed_output = out_model(self.example_input)
 
@@ -61,10 +61,10 @@ class TestTorchPermute7D(unittest.TestCase):
         self.example_input = torch.rand((2, 32, 32, 3, 4, 5, 6))
 
         self.traced_model = torch.jit.trace(self.model, self.example_input)
-        self.safe_dag = SafeDAG.from_torchscript(self.traced_model)
+        self.tdag = TensorDAG.from_torchscript(self.traced_model)
 
     def test_reconstructed_output(self):
-        out_model = self.safe_dag.to_torchscript()
+        out_model = self.tdag.to_torchscript()
         original_output = self.traced_model(self.example_input)
         reconstructed_output = out_model(self.example_input)
 

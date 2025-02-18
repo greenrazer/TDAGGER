@@ -4,7 +4,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from src.safe_dag import SafeDAG
+from src.tensor_dag import TensorDAG
 
 
 class All(nn.Module):
@@ -45,10 +45,10 @@ class TestTorchAll(unittest.TestCase):
         self.example_input = torch.rand((10, 20, 30, 48))
 
         self.traced_model = torch.jit.trace(self.model, self.example_input)
-        self.safe_dag = SafeDAG.from_torchscript(self.traced_model)
+        self.tdag = TensorDAG.from_torchscript(self.traced_model)
 
     def test_reconstructed_output(self):
-        out_model = self.safe_dag.to_torchscript()
+        out_model = self.tdag.to_torchscript()
         self.assertTrue(
             torch.allclose(
                 self.traced_model(self.example_input), out_model(self.example_input)

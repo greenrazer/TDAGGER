@@ -6,12 +6,12 @@ from .converters.reifiers import TorchReifier
 from .graph import DAGGraph, DAGGraphBuilder, Refiner
 
 
-class SafeDAG:
+class TensorDAG:
     def __init__(self, graph: DAGGraph):
         self.graph = graph
 
     @staticmethod
-    def from_torchscript(model: torch.jit.ScriptModule) -> "SafeDAG":
+    def from_torchscript(model: torch.jit.ScriptModule) -> "TensorDAG":
         canonicalizer = TorchCanonicalizer(model)
         graph_builder = DAGGraphBuilder()
         canonicalizer.build_graph(graph_builder)
@@ -20,7 +20,7 @@ class SafeDAG:
         refiner = Refiner()
         refined_graph = refiner.refine(graph)
 
-        return SafeDAG(refined_graph)
+        return TensorDAG(refined_graph)
 
     def to_torchscript(self) -> torch.nn.Module:
         lowerer = TorchLowerer()

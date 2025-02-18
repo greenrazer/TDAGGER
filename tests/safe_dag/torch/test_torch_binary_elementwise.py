@@ -3,7 +3,7 @@ import unittest
 import torch
 import torch.nn as nn
 
-from src.safe_dag import SafeDAG
+from src.tensor_dag import TensorDAG
 
 
 class BinaryElementwise(nn.Module):
@@ -26,10 +26,10 @@ class TestTorchBinaryElementwise(unittest.TestCase):
             torch.rand((10, 20, 30, 40)) + 0.01,
         )
         self.traced_model = torch.jit.trace(self.model, self.example_input)
-        self.safe_dag = SafeDAG.from_torchscript(self.traced_model)
+        self.tdag = TensorDAG.from_torchscript(self.traced_model)
 
     def test_reconstructed_output(self):
-        out_model = self.safe_dag.to_torchscript()
+        out_model = self.tdag.to_torchscript()
         out_ref = self.traced_model(*self.example_input)
         out_test = out_model(*self.example_input)
         self.assertEqual(len(out_ref), len(out_test))

@@ -60,14 +60,14 @@ model = Model()
 example_input = torch.rand((10, 20, 30, 48))
 
 traced_model = torch.jit.trace(model, example_input)
-safe_dag = SafeDAG.from_torchscript(traced_model)
+tdag = TensorDAG.from_torchscript(traced_model)
 
-print(safe_dag.graph.total_bytes())
-print(safe_dag.graph.total_flops())
-print(safe_dag.graph.total_memory_reads())
-print(safe_dag.graph.total_memory_writes())
+print(tdag.graph.total_bytes())
+print(tdag.graph.total_flops())
+print(tdag.graph.total_memory_reads())
+print(tdag.graph.total_memory_writes())
 
-reconstructed_model = safe_dag.to_torchscript()
+reconstructed_model = tdag.to_torchscript()
 assert torch.allclose(traced_model(example_input), reconstructed_model(example_input))
 ```
 
