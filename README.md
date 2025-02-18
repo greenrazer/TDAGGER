@@ -1,4 +1,4 @@
-# SafeGraph
+# TDAGGER
 
 Transforming neural networks into portable, analyzable tensor graphs.
 
