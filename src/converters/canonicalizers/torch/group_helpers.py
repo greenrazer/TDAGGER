@@ -89,7 +89,7 @@ def specs_from_reshape(
             if len(group) > 1:
                 mapping.append(group)
 
-        return [GroupSpec(groups=mapping, _output_shape_sidecar=output_shape)]
+        return [GroupSpec(groups=mapping)]
 
     # Case 2: Output is ungrouping of input dimensions
     elif input_prefix_prods_set.issubset(output_prefix_prods_set):
@@ -108,7 +108,7 @@ def specs_from_reshape(
             if len(factors) > 1:
                 mapping[input_idx - 1] = factors
 
-        return [UngroupSpec(ungroups=mapping, _output_shape_sidecar=_side_car_mapping)]
+        return [UngroupSpec(ungroups=mapping)]
 
     # Case 3: Complex reshaping
     else:
@@ -154,16 +154,12 @@ def specs_from_reshape(
                 return [
                     UngroupSpec(
                         ungroups=ungroup_map,
-                        _output_shape_sidecar=flatten_unpacked_shape(input_perm_combo),
                     ),
-                    GroupSpec(groups=group_list, _output_shape_sidecar=output_shape),
+                    GroupSpec(groups=group_list),
                 ]
 
         # Fallback case: use simple group-ungroup
         return [
-            GroupSpec(
-                groups=[list(range(len(input_shape)))],
-                _output_shape_sidecar=[product_of_noninferred_dimensions(input_shape)],
-            ),
-            UngroupSpec(ungroups={0: output_shape}, _output_shape_sidecar=output_shape),
+            GroupSpec(groups=[list(range(len(input_shape)))]),
+            UngroupSpec(ungroups={0: output_shape}),
         ]

@@ -299,7 +299,11 @@ class IRToTorchOpConverter(OpConverter[ConversionContext, Callable, OpType, List
         input_val = context.name_to_output_value[op.input.input]
         node = context.torch_graph.create("aten::reshape")
         node.addInput(input_val)
-        node.addInput(context.torch_graph.insertConstant(op.spec._output_shape_sidecar))
+        node.addInput(
+            context.torch_graph.insertConstant(
+                context.graph.op_output_shapes[op.name].shape
+            )
+        )
         return [node]
 
     def _convert_pad(
@@ -311,9 +315,8 @@ class IRToTorchOpConverter(OpConverter[ConversionContext, Callable, OpType, List
 
         # padding is stored in reverse last dim -> first dim
         pad_arr = []
-        for i in range(
-            op.spec._output_dims_sidecar - 1, min(op.spec.pad.keys()) - 1, -1
-        ):
+        output_dims = len(context.graph.op_output_shapes[op.name].shape)
+        for i in range(output_dims - 1, min(op.spec.pad.keys()) - 1, -1):
             if i in op.spec.pad:
                 pad_arr.extend(list(op.spec.pad[i]))
             else:
@@ -345,7 +348,7 @@ class IRToTorchOpConverter(OpConverter[ConversionContext, Callable, OpType, List
                 node.addInput(input_val)
                 node.addInput(
                     context.torch_graph.insertConstant(
-                        op.spec._output_shape_sidecar[-2:]
+                        context.graph.op_output_shapes[op.name].shape[-2:]
                     )
                 )
                 fold_dict = op.spec.fold
@@ -356,8 +359,8 @@ class IRToTorchOpConverter(OpConverter[ConversionContext, Callable, OpType, List
             case _:
                 raise Exception(f"Fold type Unknown: {op.spec.type}")
 
-        key_0 = 0 + len(op.spec._output_shape_sidecar) - 2
-        key_1 = 1 + len(op.spec._output_shape_sidecar) - 2
+        key_0 = 0 + len(context.graph.op_output_shapes[op.name].shape) - 2  # here
+        key_1 = 1 + len(context.graph.op_output_shapes[op.name].shape) - 2
         kernel_h, stride_h = fold_dict[key_0] if key_0 in fold_dict else (0, 0)
         kernel_w, stride_w = fold_dict[key_1] if key_1 in fold_dict else (0, 0)
         kernel = [kernel_h, kernel_w]
@@ -411,7 +414,7 @@ class IRToTorchOpConverter(OpConverter[ConversionContext, Callable, OpType, List
         node = context.torch_graph.create("aten::repeat")
 
         repeat_list = []
-        for d in range(op.spec._output_dims_sidecar):
+        for d in range(len(context.graph.op_output_shapes[op.name].shape)):
             if d in op.spec.repeat:
                 repeat_list.append(op.spec.repeat[d])
             else:

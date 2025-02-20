@@ -83,7 +83,7 @@ class CanonOpConverter(
             repeat_0_op = OpType(
                 name=f"{name}_repeat_a",
                 input=UnaryTensorInput(in_names[0]),
-                spec=RepeatSpec(repeat=repeats_0, _output_dims_sidecar=max_len),
+                spec=RepeatSpec(repeat=repeats_0),
                 debug_sources=debug_sources,
             )
             in_names[0] = repeat_0_op.name
@@ -93,7 +93,7 @@ class CanonOpConverter(
             repeat_1_op = OpType(
                 name=f"{name}_repeat_b",
                 input=UnaryTensorInput(in_names[1]),
-                spec=RepeatSpec(repeat=repeats_1, _output_dims_sidecar=max_len),
+                spec=RepeatSpec(repeat=repeats_1),
                 debug_sources=debug_sources,
             )
             in_names[1] = repeat_1_op.name

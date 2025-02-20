@@ -43,9 +43,6 @@ class PadSpec(OpSpec):
     pad: Dict[int, Tuple[int, int]]  # dim -> (pad_before, pad_after)
     pad_mode: Union[Any, PadMode]
 
-    # TODO: remove and propagate dims through network
-    _output_dims_sidecar: int
-
     @property
     def type(self) -> str:
         return "pad"

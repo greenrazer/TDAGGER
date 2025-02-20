@@ -17,7 +17,7 @@ class UnfoldFoldModule(nn.Module):
         # L[d] = (x.shape[d] + 2 * padding[d] - dilation[d] * (kernel_size[d] - 1) - 1) / stride[d] + 1
         # batch, channels * kernel_elements, prod over all d dimensions L[d]
         x = F.fold(
-            x, output_size=(32, 32), kernel_size=(2, 2), stride=3, dilation=1, padding=1
+            x, output_size=(30, 30), kernel_size=(2, 2), stride=3, dilation=1, padding=1
         )
         # L_inv[d] = (L[d] - 1) * stride[d] - 2 * padding[d] + dilation[d] * (kernel_size[d] - 1) + 1
         # batch, channels, L_inv[0], L_inv[1]
@@ -27,7 +27,7 @@ class UnfoldFoldModule(nn.Module):
 class TestTorchUnfoldFold3D(unittest.TestCase):
     def setUp(self):
         self.model = UnfoldFoldModule()
-        self.example_input = torch.rand((3, 32, 32))
+        self.example_input = torch.rand((3, 30, 30))
 
         self.traced_model = torch.jit.trace(self.model, self.example_input)
         self.tdag = TensorDAG.from_torchscript(self.traced_model)

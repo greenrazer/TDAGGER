@@ -13,9 +13,6 @@ from .op_spec import OpSpec
 class RepeatSpec(OpSpec):
     repeat: Dict[int, int]  # dim -> num_repeats
 
-    # TODO: remove and propagate shape through network
-    _output_dims_sidecar: int
-
     @property
     def type(self) -> str:
         return "repeat"

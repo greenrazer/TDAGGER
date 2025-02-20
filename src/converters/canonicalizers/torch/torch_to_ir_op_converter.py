@@ -462,9 +462,7 @@ class TorchToIROpConverter(
                 name=f"{out_name}_pad",
                 input=UnaryTensorInput(slice_op.name),
                 spec=PadSpec(
-                    pad={input_constant_values[1]: (0, after_pad_amount)},
-                    pad_mode=0,
-                    _output_dims_sidecar=len(input_shape),
+                    pad={input_constant_values[1]: (0, after_pad_amount)}, pad_mode=0
                 ),
                 debug_sources=context.debug_sources,
             )
@@ -484,8 +482,7 @@ class TorchToIROpConverter(
                 name=f"{out_name}_ungroup",
                 input=UnaryTensorInput(pad_op.name),
                 spec=UngroupSpec(
-                    ungroups={input_constant_values[1]: [-1, input_constant_values[4]]},
-                    _output_shape_sidecar=ungroup_output_shape,
+                    ungroups={input_constant_values[1]: [-1, input_constant_values[4]]}
                 ),
                 debug_sources=context.debug_sources,
             )
@@ -507,8 +504,7 @@ class TorchToIROpConverter(
                 name=out_name,
                 input=UnaryTensorInput(select_op.name),
                 spec=GroupSpec(
-                    groups=[[input_constant_values[1], input_constant_values[1] + 1]],
-                    _output_shape_sidecar=group_output_shape,
+                    groups=[[input_constant_values[1], input_constant_values[1] + 1]]
                 ),
                 debug_sources=context.debug_sources,
             )
@@ -608,9 +604,7 @@ class TorchToIROpConverter(
         pad_op = OpType(
             name=out_name,
             input=UnaryTensorInput(input_names[0]),
-            spec=PadSpec(
-                pad=pad_dict, pad_mode=pad_mode, _output_dims_sidecar=len(input_shape)
-            ),
+            spec=PadSpec(pad=pad_dict, pad_mode=pad_mode),
             debug_sources=context.debug_sources,
         )
 
@@ -643,9 +637,7 @@ class TorchToIROpConverter(
                 pad_op = OpType(
                     name=f"{out_name}_pad",
                     input=UnaryTensorInput(input_names[0]),
-                    spec=PadSpec(
-                        pad=pad_dict, pad_mode=0, _output_dims_sidecar=len(input_shape)
-                    ),
+                    spec=PadSpec(pad=pad_dict, pad_mode=0),
                     debug_sources=context.debug_sources,
                 )
                 output.append(pad_op)
@@ -672,7 +664,7 @@ class TorchToIROpConverter(
             if len(input_shape) == 4:
                 out_shape.append(input_shape[-4])
             out_shape.extend([input_shape[-3], out_size(-2), out_size(-1)])
-            spec = UnfoldSpec(unfold=unfold_dict, _output_shape_sidecar=out_shape)
+            spec = UnfoldSpec(unfold=unfold_dict)
             unfold_op = OpType(
                 name=out_name,
                 input=UnaryTensorInput(
@@ -711,10 +703,7 @@ class TorchToIROpConverter(
                 ]
             )
             # the outside equation should be (input_shape[d] - 1) * stride[d] - 2 * padding[d] + dilation[d] * (kernel_size[d] - 1) + 1
-            spec = FoldSpec(
-                fold=unfold_dict,
-                _output_shape_sidecar=out_shape,
-            )
+            spec = FoldSpec(fold=unfold_dict)
             fold_op = OpType(
                 name=f"{out_name}_fold" if has_padding else out_name,
                 input=UnaryTensorInput(input_names[0]),
@@ -799,25 +788,21 @@ class TorchToIROpConverter(
             ungroup_op = OpType(
                 name=f"{out_name}_ungroup",
                 input=UnaryTensorInput(input_name),
-                spec=UngroupSpec(
-                    ungroups=ungroup_dict, _output_shape_sidecar=ungroup_shape
-                ),
+                spec=UngroupSpec(ungroups=ungroup_dict),
                 debug_sources=context.debug_sources,
             )
 
             repeat_op = OpType(
                 name=f"{out_name}_repeat",
                 input=UnaryTensorInput(ungroup_op.name),
-                spec=RepeatSpec(
-                    repeat=repeat_dict, _output_dims_sidecar=len(ungroup_shape)
-                ),
+                spec=RepeatSpec(repeat=repeat_dict),
                 debug_sources=context.debug_sources,
             )
 
             group_op = OpType(
                 name=out_name,
                 input=UnaryTensorInput(repeat_op.name),
-                spec=GroupSpec(groups=groups, _output_shape_sidecar=group_shape),
+                spec=GroupSpec(groups=groups),
                 debug_sources=context.debug_sources,
             )
 

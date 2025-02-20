@@ -14,9 +14,6 @@ from .op_spec import OpSpec
 class GroupSpec(OpSpec):
     groups: List[List[int]]
 
-    # TODO: remove and propagate shape through network
-    _output_shape_sidecar: List[int]
-
     @property
     def type(self) -> str:
         return "group"

@@ -7,45 +7,27 @@ from src.ir.safe_ir import DataType, GroupSpec, TensorSpec
 class TestGroupSpec(unittest.TestCase):
     def test_basic(self):
         # doesn't raise
-        GroupSpec(
-            groups=[[1, 2, 3], [6, 7]],
-            _output_shape_sidecar=[],  # shouldn't need this
-        )
+        GroupSpec(groups=[[1, 2, 3], [6, 7]])
 
     def test_raises_on_overlap(self):
         with self.assertRaises(Exception):
-            GroupSpec(
-                groups=[[1, 2, 3], [3, 4]],
-                _output_shape_sidecar=[],  # shouldn't need this
-            )
+            GroupSpec(groups=[[1, 2, 3], [3, 4]])
 
     def test_raises_on_non_consecutive(self):
         with self.assertRaises(Exception):
-            GroupSpec(
-                groups=[[1, 2, 5]],
-                _output_shape_sidecar=[],  # shouldn't need this
-            )
+            GroupSpec(groups=[[1, 2, 5]])
 
         with self.assertRaises(Exception):
-            GroupSpec(
-                groups=[[-3, -1]],
-                _output_shape_sidecar=[],  # shouldn't need this
-            )
+            GroupSpec(groups=[[-3, -1]])
 
     def test_raises_on_mixed_group_dims(self):
         with self.assertRaises(Exception):
-            GroupSpec(
-                groups=[[1, 2, -3]],
-                _output_shape_sidecar=[],  # shouldn't need this
-            )
+            GroupSpec(groups=[[1, 2, -3]])
 
 
 class TestGroupOutputSpec(unittest.TestCase):
     def test_basic(self):
-        spec = GroupSpec(
-            groups=[[1, 2, 3], [6, 7]],
-            _output_shape_sidecar=[],  # shouldn't need this
-        )
+        spec = GroupSpec(groups=[[1, 2, 3], [6, 7]])
 
         input_specs = [
             TensorSpec(shape=(1, 2, 3, 4, 5, 6, 7, 8), data_type=DataType.FLOAT32)
@@ -57,10 +39,7 @@ class TestGroupOutputSpec(unittest.TestCase):
         self.assertEqual(out_spec.data_type, DataType.FLOAT32)
 
     def test_negitive_dimensions(self):
-        spec = GroupSpec(
-            groups=[[1, 2, 3], [-2, -1]],
-            _output_shape_sidecar=[],  # shouldn't need this
-        )
+        spec = GroupSpec(groups=[[1, 2, 3], [-2, -1]])
 
         input_specs = [
             TensorSpec(shape=(1, 2, 3, 4, 5, 6, 7, 8), data_type=DataType.FLOAT32)
@@ -72,10 +51,7 @@ class TestGroupOutputSpec(unittest.TestCase):
         self.assertEqual(out_spec.data_type, DataType.FLOAT32)
 
     def test_concrete_negitive_dimensions_appear_before(self):
-        spec = GroupSpec(
-            groups=[[6, 7], [-7, -6, -5]],
-            _output_shape_sidecar=[],  # shouldn't need this
-        )
+        spec = GroupSpec(groups=[[6, 7], [-7, -6, -5]])
 
         input_specs = [
             TensorSpec(shape=(1, 2, 3, 4, 5, 6, 7, 8), data_type=DataType.FLOAT32)
@@ -87,10 +63,7 @@ class TestGroupOutputSpec(unittest.TestCase):
         self.assertEqual(out_spec.data_type, DataType.FLOAT32)
 
     def test_raises_on_negitive_overlap(self):
-        spec = GroupSpec(
-            groups=[[1, 2, 3], [-2, -1]],
-            _output_shape_sidecar=[],  # shouldn't need this
-        )
+        spec = GroupSpec(groups=[[1, 2, 3], [-2, -1]])
 
         input_specs = [TensorSpec(shape=(1, 2, 3, 4), data_type=DataType.FLOAT32)]
 
@@ -98,10 +71,7 @@ class TestGroupOutputSpec(unittest.TestCase):
             spec.output_spec(input_specs)
 
     def test_raises_on_insufficient_shape(self):
-        spec = GroupSpec(
-            groups=[[2, 3, 4]],
-            _output_shape_sidecar=[],  # shouldn't need this
-        )
+        spec = GroupSpec(groups=[[2, 3, 4]])
 
         input_specs = [TensorSpec(shape=(1, 2, 3, 4), data_type=DataType.FLOAT32)]
 
@@ -111,10 +81,7 @@ class TestGroupOutputSpec(unittest.TestCase):
 
 class TestGroupComputeStats(unittest.TestCase):
     def test_basic(self):
-        spec = GroupSpec(
-            groups=[[1, 2, 3], [6, 7]],
-            _output_shape_sidecar=[],  # shouldn't need this
-        )
+        spec = GroupSpec(groups=[[1, 2, 3], [6, 7]])
 
         input_specs = [
             TensorSpec(shape=(1, 2, 3, 4, 5, 6, 7, 8), data_type=DataType.FLOAT32)
@@ -127,10 +94,7 @@ class TestGroupComputeStats(unittest.TestCase):
         self.assertEqual(out_spec.writes, math.prod(input_specs[0].shape))
 
     def test_raises_on_negitive_overlap(self):
-        spec = GroupSpec(
-            groups=[[1, 2, 3], [-2, -1]],
-            _output_shape_sidecar=[],  # shouldn't need this
-        )
+        spec = GroupSpec(groups=[[1, 2, 3], [-2, -1]])
 
         input_specs = [TensorSpec(shape=(1, 2, 3, 4), data_type=DataType.FLOAT32)]
 

@@ -6,11 +6,7 @@ from src.ir.safe_ir import DataType, PadSpec, TensorSpec
 
 class TestPadOutputSpec(unittest.TestCase):
     def test_basic(self):
-        spec = PadSpec(
-            pad={0: (2, 2), 2: (3, 4), 3: (0, 5), 5: (1, 0)},
-            pad_mode=0,
-            _output_dims_sidecar=0,  # shouldn't need this
-        )
+        spec = PadSpec(pad={0: (2, 2), 2: (3, 4), 3: (0, 5), 5: (1, 0)}, pad_mode=0)
 
         input_specs = [
             TensorSpec(shape=(1, 2, 3, 4, 5, 6, 7, 8), data_type=DataType.FLOAT32)
@@ -22,11 +18,7 @@ class TestPadOutputSpec(unittest.TestCase):
         self.assertEqual(out_spec.data_type, DataType.FLOAT32)
 
     def test_negitive_dimensions(self):
-        spec = PadSpec(
-            pad={0: (2, 2), 2: (3, 4), -2: (0, 5), -1: (1, 0)},
-            pad_mode=0,
-            _output_dims_sidecar=0,  # shouldn't need this
-        )
+        spec = PadSpec(pad={0: (2, 2), 2: (3, 4), -2: (0, 5), -1: (1, 0)}, pad_mode=0)
 
         input_specs = [
             TensorSpec(shape=(1, 2, 3, 4, 5, 6, 7, 8), data_type=DataType.FLOAT32)
@@ -38,11 +30,7 @@ class TestPadOutputSpec(unittest.TestCase):
         self.assertEqual(out_spec.data_type, DataType.FLOAT32)
 
     def test_raises_on_negitive_overlap(self):
-        spec = PadSpec(
-            pad={2: (3, 4), -2: (1, 0)},
-            pad_mode=0,
-            _output_dims_sidecar=0,  # shouldn't need this
-        )
+        spec = PadSpec(pad={2: (3, 4), -2: (1, 0)}, pad_mode=0)
 
         input_specs = [TensorSpec(shape=(1, 2, 3, 4), data_type=DataType.FLOAT32)]
 
@@ -50,11 +38,7 @@ class TestPadOutputSpec(unittest.TestCase):
             spec.output_spec(input_specs)
 
     def test_raises_on_insufficient_shape(self):
-        spec = PadSpec(
-            pad={3: (3, 4), 4: (1, 0)},
-            pad_mode=0,
-            _output_dims_sidecar=0,  # shouldn't need this
-        )
+        spec = PadSpec(pad={3: (3, 4), 4: (1, 0)}, pad_mode=0)
 
         input_specs = [TensorSpec(shape=(1, 2, 3, 4), data_type=DataType.FLOAT32)]
 
@@ -64,11 +48,7 @@ class TestPadOutputSpec(unittest.TestCase):
 
 class TestPadComputeStats(unittest.TestCase):
     def test_basic(self):
-        spec = PadSpec(
-            pad={0: (2, 2), 2: (3, 4), 3: (0, 5), 5: (1, 0)},
-            pad_mode=0,
-            _output_dims_sidecar=0,  # shouldn't need this
-        )
+        spec = PadSpec(pad={0: (2, 2), 2: (3, 4), 3: (0, 5), 5: (1, 0)}, pad_mode=0)
 
         input_specs = [
             TensorSpec(shape=(1, 2, 3, 4, 5, 6, 7, 8), data_type=DataType.FLOAT32)
@@ -85,7 +65,6 @@ class TestPadComputeStats(unittest.TestCase):
         spec = PadSpec(
             pad={0: (2, 2), 2: (3, 4), 3: (0, 5), 5: (1, 0)},
             pad_mode=PadSpec.PadMode.CIRCULAR,
-            _output_dims_sidecar=0,  # shouldn't need this
         )
 
         input_specs = [

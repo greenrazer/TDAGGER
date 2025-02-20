@@ -13,9 +13,6 @@ from .op_spec import OpSpec
 class UnfoldSpec(OpSpec):
     unfold: Dict[int, Tuple[int, int]]  # dim -> (kernel_size, stride)
 
-    # TODO: remove and propagate shape through network
-    _output_shape_sidecar: List[int]
-
     @property
     def type(self) -> str:
         return "unfold"
