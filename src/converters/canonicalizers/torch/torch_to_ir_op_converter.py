@@ -201,49 +201,15 @@ class TorchToIROpConverter(
         # torch add unintuitively has 3 inputs a, b, and alpha for a + alpha*b
         # I will ignore the alpha parameter beacuse it is not nessisary,
         # and if someone is using it they are doing something wrong
-
-        shapes = [
-            context.name_to_spec[context.output_value_to_name[t]].shape
-            if t in context.output_value_to_name
-            else torch_op.inputsAt(i).type().sizes()
-            for i, t in enumerate(torch_op.inputs())
-            if t.type().kind() == "TensorType"
-        ]
-        shape_0 = shapes[0]
-        shape_1 = shapes[1]
-
-        # if both input shapes are equal it's easy
-        if shape_0 == shape_1:
-            bin_op = OpType(
-                name=out_name,
-                input=BinaryTensorInput(input_names[0], input_names[1]),
-                spec=BinaryElementwiseSpec(
-                    ATEN_TO_BINARY_ELEMENTWISE_SPEC[torch_op.kind()]
-                ),
-                debug_sources=context.debug_sources,
-            )
-            return [bin_op], {}
-        else:
-            out_ops, _brodcast_consts, in_names = self._create_broadcast(
-                f"{out_name}_broadcast",
-                input_names[0],
-                shape_0,
-                input_names[1],
-                shape_1,
-                debug_sources=context.debug_sources,
-            )
-
-            bin_op = OpType(
-                name=out_name,
-                input=BinaryTensorInput(in_names[0], in_names[1]),
-                spec=BinaryElementwiseSpec(
-                    ATEN_TO_BINARY_ELEMENTWISE_SPEC[torch_op.kind()]
-                ),
-                debug_sources=context.debug_sources,
-            )
-            out_ops.append(bin_op)
-
-            return out_ops, {}
+        bin_op = OpType(
+            name=out_name,
+            input=BinaryTensorInput(input_names[0], input_names[1]),
+            spec=BinaryElementwiseSpec(
+                ATEN_TO_BINARY_ELEMENTWISE_SPEC[torch_op.kind()]
+            ),
+            debug_sources=context.debug_sources,
+        )
+        return [bin_op], {}
 
     def _convert_unary_elementwise(
         self, context: ConversionContext, torch_op: torch._C.Node
@@ -305,23 +271,11 @@ class TorchToIROpConverter(
     ) -> Tuple[List[OpType], Dict[str, Union[ScalarType, TensorType]]]:
         out_name = torch_op.output().debugName().replace(".", "_")
 
-        shapes = [
-            context.name_to_spec[context.output_value_to_name[t]].shape
-            if t in context.output_value_to_name
-            else torch_op.inputsAt(i).type().sizes()
-            for i, t in enumerate(torch_op.inputs())
-            if t.type().kind() == "TensorType"
-        ]
-        shape_0 = shapes[0]
-        shape_1 = shapes[1]
-
         input_names = self._inputs_to_names(context, torch_op)
         return self._create_subtract(
             out_name,
             input_names[0],
             input_names[1],
-            input_a_shape=shape_0,
-            input_b_shape=shape_1,
             debug_sources=context.debug_sources,
         )
 
@@ -329,24 +283,11 @@ class TorchToIROpConverter(
         self, context: ConversionContext, torch_op: torch._C.Node
     ) -> Tuple[List[OpType], Dict[str, Union[ScalarType, TensorType]]]:
         out_name = torch_op.output().debugName().replace(".", "_")
-
-        shapes = [
-            context.name_to_spec[context.output_value_to_name[t]].shape
-            if t in context.output_value_to_name
-            else torch_op.inputsAt(i).type().sizes()
-            for i, t in enumerate(torch_op.inputs())
-            if t.type().kind() == "TensorType"
-        ]
-        shape_0 = shapes[0]
-        shape_1 = shapes[1]
-
         input_names = self._inputs_to_names(context, torch_op)
         return self._create_divide(
             out_name,
             input_names[0],
             input_names[1],
-            input_a_shape=shape_0,
-            input_b_shape=shape_1,
             debug_sources=context.debug_sources,
         )
 

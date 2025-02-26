@@ -301,17 +301,17 @@ class TorchCanonicalizer(Canonicalizer):
 
             if not ready_nodes:
                 remaining_nodes = nodes_to_process - self.processed_nodes
-                for r in remaining_nodes:
-                    print(r)
-                    for input_val in r.inputs():
-                        print(
-                            "     ",
-                            input_val,
-                            self.output_value_to_node[input_val],
-                            self.output_value_to_node[input_val]
-                            in self.processed_nodes,
-                        )
                 if remaining_nodes:
+                    for r in remaining_nodes:
+                        print(r)
+                        for input_val in r.inputs():
+                            print(
+                                "     ",
+                                input_val,
+                                self.output_value_to_node[input_val],
+                                self.output_value_to_node[input_val]
+                                in self.processed_nodes,
+                            )
                     raise Exception(
                         "Graph creation failed: All remaining unprocessed nodes have at least one unprocessed input."
                     )

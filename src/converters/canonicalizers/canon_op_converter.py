@@ -25,89 +25,11 @@ class CanonOpConverter(
     OpConverter[ContextT, ConverterT, InputT, OutputT],
     Generic[ContextT, ConverterT, InputT, OutputT],
 ):
-    def _create_broadcast(
-        self,
-        name: str,
-        input_a: str,
-        input_a_shape: List[int],
-        input_b: str,
-        input_b_shape: List[int],
-        debug_sources=[],
-    ) -> Tuple[List[OpType], Dict[str, Union[TensorType, ScalarType]], List[str]]:
-        s0 = list(reversed(input_a_shape))
-        s1 = list(reversed(input_b_shape))
-
-        max_len = max(len(s0), len(s1))
-
-        unsqueeze_left_amount = abs(len(s0) - len(s1))
-        unsqueeze_idx, unsqueeze_shape_reversed = (
-            (1, s1) if len(s0) == max_len else (0, s0)
-        )
-
-        unsqueeze_shape_reversed.extend([1] * (unsqueeze_left_amount))
-
-        # Calculate resulting shape
-        repeats_0 = {}
-        repeats_1 = {}
-
-        s0 = list(reversed(s0))
-        s1 = list(reversed(s1))
-
-        # Check compatibility of each dimension
-        for dim, (dim0, dim1) in enumerate(zip(s0, s1)):
-            if dim0 == dim1:
-                pass
-            elif dim0 == 1:
-                repeats_0[dim] = dim1
-            elif dim1 == 1:
-                repeats_1[dim] = dim0
-            else:
-                raise Exception(
-                    f"two inputs cannot be broadcast: {input_a_shape} {input_b_shape}."
-                )
-
-        in_names = [input_a, input_b]
-        out_ops = []
-        if unsqueeze_left_amount > 0:
-            unsqueeze_op = OpType(
-                name=f"{name}_unsqueeze",
-                input=UnaryTensorInput(in_names[unsqueeze_idx]),
-                spec=UnsqueezeSpec(
-                    dimensions={i for i in range(unsqueeze_left_amount)}
-                ),
-            )
-            in_names[unsqueeze_idx] = unsqueeze_op.name
-            out_ops.append(unsqueeze_op)
-
-        if len(repeats_0) > 0:
-            repeat_0_op = OpType(
-                name=f"{name}_repeat_a",
-                input=UnaryTensorInput(in_names[0]),
-                spec=RepeatSpec(repeat=repeats_0),
-                debug_sources=debug_sources,
-            )
-            in_names[0] = repeat_0_op.name
-            out_ops.append(repeat_0_op)
-
-        if len(repeats_1) > 0:
-            repeat_1_op = OpType(
-                name=f"{name}_repeat_b",
-                input=UnaryTensorInput(in_names[1]),
-                spec=RepeatSpec(repeat=repeats_1),
-                debug_sources=debug_sources,
-            )
-            in_names[1] = repeat_1_op.name
-            out_ops.append(repeat_1_op)
-
-        return out_ops, {}, in_names
-
     def _create_subtract(
         self,
         name: str,
         input_a: str,
         input_b: str,
-        input_a_shape: List[int] = [],
-        input_b_shape: List[int] = [],
         debug_sources=[],
     ) -> Tuple[List[OpType], Dict[str, Union[TensorType, ScalarType]]]:
         neg_b = OpType(
@@ -119,43 +41,20 @@ class CanonOpConverter(
             debug_sources=debug_sources,
         )
 
-        if len(input_a_shape) == 0 or len(input_b_shape) == 0:
-            op = OpType(
-                name=f"{name}",
-                input=BinaryTensorInput(input_a, input_b),
-                spec=BinaryElementwiseSpec(
-                    BinaryElementwiseSpec.BinaryElementwiseType.ADD
-                ),
-                debug_sources=debug_sources,
-            )
-
-            return [op], {}
-
-        out_ops, _brodcast_consts, in_names = self._create_broadcast(
-            f"{name}_broadcast",
-            input_a,
-            input_a_shape,
-            neg_b.name,
-            input_b_shape,
-            debug_sources=debug_sources,
-        )
-
         op = OpType(
             name=f"{name}",
-            input=BinaryTensorInput(in_names[0], in_names[1]),
+            input=BinaryTensorInput(input_a, neg_b.name),
             spec=BinaryElementwiseSpec(BinaryElementwiseSpec.BinaryElementwiseType.ADD),
             debug_sources=debug_sources,
         )
 
-        return [neg_b] + out_ops + [op], {}
+        return [neg_b, op], {}
 
     def _create_divide(
         self,
         name: str,
         input_a: str,
         input_b: str,
-        input_a_shape: List[int] = [],
-        input_b_shape: List[int] = [],
         debug_sources=[],
     ) -> Tuple[List[OpType], Dict[str, Union[TensorType, ScalarType]]]:
         reciprocal_b = OpType(
@@ -167,37 +66,16 @@ class CanonOpConverter(
             debug_sources=debug_sources,
         )
 
-        if len(input_a_shape) == 0 or len(input_b_shape) == 0:
-            op = OpType(
-                name=f"{name}",
-                input=BinaryTensorInput(input_a, input_b),
-                spec=BinaryElementwiseSpec(
-                    BinaryElementwiseSpec.BinaryElementwiseType.MULTIPLY
-                ),
-                debug_sources=debug_sources,
-            )
-
-            return [op], {}
-
-        out_ops, _brodcast_consts, in_names = self._create_broadcast(
-            f"{name}_broadcast",
-            input_a,
-            input_a_shape,
-            reciprocal_b.name,
-            input_b_shape,
-            debug_sources=debug_sources,
-        )
-
         op = OpType(
             name=f"{name}",
-            input=BinaryTensorInput(in_names[0], in_names[1]),
+            input=BinaryTensorInput(input_a, reciprocal_b.name),
             spec=BinaryElementwiseSpec(
                 BinaryElementwiseSpec.BinaryElementwiseType.MULTIPLY
             ),
             debug_sources=debug_sources,
         )
 
-        return [reciprocal_b] + out_ops + [op], {}
+        return [reciprocal_b, op], {}
 
     def _create_elementwise_abs(
         self, name: str, input: str, debug_sources=[]
