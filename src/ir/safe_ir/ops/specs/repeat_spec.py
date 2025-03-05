@@ -3,7 +3,7 @@ from enum import Enum, auto
 from typing import Any, Dict, List, Set, Tuple, Type, Union
 
 from ....compute_stats import ComputeStats
-from ...safe_ir import ScalarSpec, SpecType, TensorSpec
+from ...safe_ir import ScalarSpec, SpecType, SymbolicTensorSpec, TensorSpec
 from ..inputs.op_input import OpInput
 from ..inputs.unary_tensor_input import UnaryTensorInput
 from .op_spec import OpSpec
@@ -80,7 +80,10 @@ class RepeatSpec(OpSpec):
         if not all(seen.values()):
             raise Exception(f"shape not sufficient for repeat spec: {inputs[0].shape}.")
 
-        return TensorSpec(shape=out_shape, data_type=inputs[0].data_type)
+        out_cls = (
+            TensorSpec if isinstance(inputs[0], TensorSpec) else SymbolicTensorSpec
+        )
+        return out_cls(shape=out_shape, data_type=inputs[0].data_type)
 
     def compute_stats(self, inputs: List[SpecType]) -> ComputeStats:
         out_spec = self.output_spec(inputs)
@@ -89,3 +92,11 @@ class RepeatSpec(OpSpec):
             reads=inputs[0].size(),
             writes=out_spec.size(),
         )
+
+    def with_removed_dimensions(self, dimensions: List[int]) -> "RepeatSpec":
+        new_repeat_dict = {}
+        for repeat_dim, repeat_info in self.repeat.items():
+            if repeat_dim not in dimensions:
+                num_before = sum(1 for dim in dimensions if dim < repeat_dim)
+                new_repeat_dict[repeat_dim - num_before] = repeat_info
+        return RepeatSpec(repeat=new_repeat_dict)

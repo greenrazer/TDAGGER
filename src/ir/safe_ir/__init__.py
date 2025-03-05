@@ -1,5 +1,5 @@
 from .ops import (
-    BinaryElementwiseSpec,
+    BinaryBroadcastElementwiseSpec,
     BinaryTensorInput,
     FoldSpec,
     GroupSpec,
@@ -8,6 +8,7 @@ from .ops import (
     OpType,
     PadSpec,
     PermuteSpec,
+    ReducedDimension,
     ReduceSpec,
     RepeatSpec,
     SelectSpec,

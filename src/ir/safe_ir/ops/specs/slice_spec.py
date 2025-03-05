@@ -2,8 +2,10 @@ from dataclasses import dataclass
 from enum import Enum, auto
 from typing import Any, Dict, List, Set, Tuple, Type, Union
 
+from sympy import Expr
+
 from ....compute_stats import ComputeStats
-from ...safe_ir import ScalarSpec, SpecType, TensorSpec
+from ...safe_ir import ScalarSpec, SpecType, SymbolicTensorSpec, TensorSpec
 from ..inputs.op_input import OpInput
 from ..inputs.unary_tensor_input import UnaryTensorInput
 from .op_spec import OpSpec
@@ -84,18 +86,19 @@ class SliceSpec(OpSpec):
                 raw_begin, raw_end = real_indices_dict[i]
                 begin = raw_begin if raw_begin >= 0 else size + raw_begin
                 end = raw_end if raw_end >= 0 else size + raw_end
-                if begin >= size:
-                    raise Exception(
-                        f"Begin index must smaller than the size of the dimension: dimension={i} size={size} begin={begin}"
-                    )
-                if end >= size:
-                    raise Exception(
-                        f"End index must smaller than the size of the dimension: dimension={i} size={size} end={end}"
-                    )
-                if begin > end:
-                    raise Exception(
-                        f"Begin index must be before end index: dimension={i} begin={begin} end={end}"
-                    )
+                if isinstance(size, int):
+                    if begin >= size:
+                        raise Exception(
+                            f"Begin index must smaller than the size of the dimension: dimension={i} size={size} begin={begin}"
+                        )
+                    if end >= size:
+                        raise Exception(
+                            f"End index must smaller than the size of the dimension: dimension={i} size={size} end={end}"
+                        )
+                    if begin > end:
+                        raise Exception(
+                            f"Begin index must be before end index: dimension={i} begin={begin} end={end}"
+                        )
                 out_shape.append(end - begin + 1)
                 seen[i] = True
             else:
@@ -104,7 +107,10 @@ class SliceSpec(OpSpec):
         if not all(seen.values()):
             raise Exception(f"shape not sufficient for slice spec: {inputs[0].shape}.")
 
-        return TensorSpec(shape=out_shape, data_type=inputs[0].data_type)
+        out_cls = (
+            TensorSpec if isinstance(inputs[0], TensorSpec) else SymbolicTensorSpec
+        )
+        return out_cls(shape=out_shape, data_type=inputs[0].data_type)
 
     def compute_stats(self, inputs: List[SpecType]) -> ComputeStats:
         out_spec = self.output_spec(inputs)
@@ -113,3 +119,11 @@ class SliceSpec(OpSpec):
             reads=out_spec.size(),
             writes=out_spec.size(),
         )
+
+    def with_removed_dimensions(self, dimensions: List[int]) -> "SliceSpec":
+        new_slice_dict = {}
+        for slice_dim, slice_info in self.slice.items():
+            if slice_dim not in dimensions:
+                num_before = sum(1 for dim in dimensions if dim < slice_dim)
+                new_slice_dict[slice_dim - num_before] = slice_info
+        return SliceSpec(slice=new_slice_dict)

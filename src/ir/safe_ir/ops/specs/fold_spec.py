@@ -3,7 +3,7 @@ from enum import Enum, auto
 from typing import Dict, List, Set, Tuple, Type, Union
 
 from ....compute_stats import ComputeStats
-from ...safe_ir import ScalarSpec, SpecType, TensorSpec
+from ...safe_ir import ScalarSpec, SpecType, SymbolicTensorSpec, TensorSpec
 from ..inputs.op_input import OpInput
 from ..inputs.unary_tensor_input import UnaryTensorInput
 from .op_spec import OpSpec
@@ -76,7 +76,10 @@ class FoldSpec(OpSpec):
         if not all(seen.values()):
             raise Exception(f"shape not sufficient for fold spec: {inputs[0].shape}.")
 
-        return TensorSpec(shape=out_shape, data_type=inputs[0].data_type)
+        out_cls = (
+            TensorSpec if isinstance(inputs[0], TensorSpec) else SymbolicTensorSpec
+        )
+        return out_cls(shape=out_shape, data_type=inputs[0].data_type)
 
     def compute_stats(self, inputs: List[SpecType]) -> ComputeStats:
         return ComputeStats(
@@ -84,3 +87,11 @@ class FoldSpec(OpSpec):
             reads=0,
             writes=0,
         )
+
+    def with_removed_dimensions(self, dimensions: List[int]) -> "FoldSpec":
+        new_fold_dict = {}
+        for fold_dim, fold_info in self.fold.items():
+            if fold_dim not in dimensions:
+                num_before = sum(1 for dim in dimensions if dim < fold_dim)
+                new_fold_dict[fold_dim - num_before] = fold_info
+        return FoldSpec(fold=new_fold_dict)

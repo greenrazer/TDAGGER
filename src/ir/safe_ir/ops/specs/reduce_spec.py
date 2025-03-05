@@ -4,10 +4,10 @@ from enum import Enum, auto
 from typing import Any, Dict, List, Set, Tuple, Type, Union
 
 from ....compute_stats import ComputeStats
-from ...safe_ir import ScalarSpec, SpecType, TensorSpec
+from ...safe_ir import ScalarSpec, SpecType, SymbolicTensorSpec, TensorSpec
 from ..inputs.op_input import OpInput
 from ..inputs.unary_tensor_input import UnaryTensorInput
-from .op_spec import OpSpec
+from .op_spec import OpSpec, ReducedDimension
 
 
 @dataclass
@@ -84,7 +84,10 @@ class ReduceSpec(OpSpec):
         out_shape = []
         for i, size in enumerate(inputs[0].shape):
             if i in real_indices:
-                out_shape.append(1)
+                if isinstance(size, int):
+                    out_shape.append(1)
+                else:
+                    out_shape.append(ReducedDimension(size))
                 seen[i] = True
             else:
                 out_shape.append(size)
@@ -94,7 +97,10 @@ class ReduceSpec(OpSpec):
                 f"shape not sufficient for reduction spec: {inputs[0].shape}."
             )
 
-        return TensorSpec(shape=out_shape, data_type=inputs[0].data_type)
+        out_cls = (
+            TensorSpec if isinstance(inputs[0], TensorSpec) else SymbolicTensorSpec
+        )
+        return out_cls(shape=out_shape, data_type=inputs[0].data_type)
 
     def compute_stats(self, inputs: List[SpecType]) -> ComputeStats:
         real_indices = {
@@ -145,3 +151,11 @@ class ReduceSpec(OpSpec):
                 )
             case _:
                 assert False, "ReductionType not defined"
+
+    def with_removed_dimensions(self, dimensions: List[int]) -> "ReduceSpec":
+        new_reduction = set()
+        for reduce_dim in self.dimensions:
+            if reduce_dim not in dimensions:
+                num_before = sum(1 for dim in dimensions if dim < reduce_dim)
+                new_reduction.add(reduce_dim - num_before)
+        return ReduceSpec(dimensions=new_reduction, reduction_type=self.reduction_type)

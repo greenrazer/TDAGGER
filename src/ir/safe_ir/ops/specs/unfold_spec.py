@@ -3,7 +3,7 @@ from enum import Enum, auto
 from typing import Dict, List, Set, Tuple, Type, Union
 
 from ....compute_stats import ComputeStats
-from ...safe_ir import ScalarSpec, SpecType, TensorSpec
+from ...safe_ir import ScalarSpec, SpecType, SymbolicTensorSpec, TensorSpec
 from ..inputs.op_input import OpInput
 from ..inputs.unary_tensor_input import UnaryTensorInput
 from .op_spec import OpSpec
@@ -79,7 +79,10 @@ class UnfoldSpec(OpSpec):
         if not all(seen.values()):
             raise Exception(f"shape not sufficient for unfold spec: {inputs[0].shape}.")
 
-        return TensorSpec(shape=out_shape, data_type=inputs[0].data_type)
+        out_cls = (
+            TensorSpec if isinstance(inputs[0], TensorSpec) else SymbolicTensorSpec
+        )
+        return out_cls(shape=out_shape, data_type=inputs[0].data_type)
 
     def compute_stats(self, inputs: List[SpecType]) -> ComputeStats:
         return ComputeStats(
@@ -87,3 +90,11 @@ class UnfoldSpec(OpSpec):
             reads=0,
             writes=0,
         )
+
+    def with_removed_dimensions(self, dimensions: List[int]) -> "UnfoldSpec":
+        new_unfold_dict = {}
+        for unfold_dim, unfold_info in self.unfold.items():
+            if unfold_dim not in dimensions:
+                num_before = sum(1 for dim in dimensions if dim < unfold_dim)
+                new_unfold_dict[unfold_dim - num_before] = unfold_info
+        return UnfoldSpec(unfold=new_unfold_dict)

@@ -4,7 +4,7 @@ from enum import Enum, auto
 from typing import Dict, List, Set, Tuple, Type, Union
 
 from ....compute_stats import ComputeStats
-from ...safe_ir import ScalarSpec, SpecType, TensorSpec
+from ...safe_ir import ScalarSpec, SpecType, SymbolicTensorSpec, TensorSpec
 from ..inputs.op_input import OpInput
 from ..inputs.unary_tensor_input import UnaryTensorInput
 from .op_spec import OpSpec
@@ -75,14 +75,19 @@ class UngroupSpec(OpSpec):
                 ungroup = real_indices_dict[i].copy()
                 if -1 in ungroup:
                     divisor = math.prod([idx for idx in ungroup if idx != -1])
-                    if size % divisor != 0:
-                        raise Exception(f"Cannot reshape: {size} into {ungroup}.")
+                    if isinstance(size, int):
+                        if size % divisor != 0:
+                            raise Exception(f"Cannot reshape: {size} into {ungroup}.")
                     missing_index = ungroup.index(-1)
                     ungroup[missing_index] = size // divisor
                 else:
-                    divisor = math.prod([idx for idx in ungroup])
-                    if size != divisor:
-                        raise Exception(f"Cannot reshape: {size} into {ungroup}.")
+                    if isinstance(size, int):
+                        divisor = math.prod([idx for idx in ungroup])
+                        if size != divisor:
+                            raise Exception(f"Cannot reshape: {size} into {ungroup}.")
+                    else:
+                        divisor = math.prod(ungroup[1:])
+                        ungroup[0] = size // divisor
 
                 out_shape.extend(ungroup)
                 seen[i] = True
@@ -94,7 +99,10 @@ class UngroupSpec(OpSpec):
                 f"shape not sufficient for ungroup spec: {inputs[0].shape}."
             )
 
-        return TensorSpec(shape=out_shape, data_type=inputs[0].data_type)
+        out_cls = (
+            TensorSpec if isinstance(inputs[0], TensorSpec) else SymbolicTensorSpec
+        )
+        return out_cls(shape=out_shape, data_type=inputs[0].data_type)
 
     def compute_stats(self, inputs: List[SpecType]) -> ComputeStats:
         out_spec = self.output_spec(inputs)
@@ -103,3 +111,11 @@ class UngroupSpec(OpSpec):
             reads=out_spec.size(),
             writes=out_spec.size(),
         )
+
+    def with_removed_dimensions(self, dimensions: List[int]) -> "UngroupSpec":
+        new_ungroups_dict = {}
+        for ungroups_dim, ungroups_info in self.ungroups.items():
+            if ungroups_dim not in dimensions:
+                num_before = sum(1 for dim in dimensions if dim < ungroups_dim)
+                new_ungroups_dict[ungroups_dim - num_before] = ungroups_info
+        return UngroupSpec(ungroups=new_ungroups_dict)

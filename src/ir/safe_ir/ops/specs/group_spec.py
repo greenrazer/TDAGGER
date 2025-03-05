@@ -4,7 +4,7 @@ from enum import Enum, auto
 from typing import Dict, List, Set, Tuple, Type, Union
 
 from ....compute_stats import ComputeStats
-from ...safe_ir import ScalarSpec, SpecType, TensorSpec
+from ...safe_ir import ScalarSpec, SpecType, SymbolicTensorSpec, TensorSpec
 from ..inputs.op_input import OpInput
 from ..inputs.unary_tensor_input import UnaryTensorInput
 from .op_spec import OpSpec
@@ -123,7 +123,10 @@ class GroupSpec(OpSpec):
         if not all(seen.values()):
             raise Exception(f"shape not sufficient for group spec: {inputs[0].shape}.")
 
-        return TensorSpec(shape=out_shape, data_type=inputs[0].data_type)
+        out_cls = (
+            TensorSpec if isinstance(inputs[0], TensorSpec) else SymbolicTensorSpec
+        )
+        return out_cls(shape=out_shape, data_type=inputs[0].data_type)
 
     def compute_stats(self, inputs: List[SpecType]) -> ComputeStats:
         out_spec = self.output_spec(inputs)
@@ -132,3 +135,16 @@ class GroupSpec(OpSpec):
             reads=out_spec.size(),
             writes=out_spec.size(),
         )
+
+    def with_removed_dimensions(self, dimensions: List[int]) -> "GroupSpec":
+        new_groups = []
+        for group in self.groups:
+            inner = []
+            for group_dim in group:
+                if group_dim not in dimensions:
+                    num_before = sum(1 for dim in dimensions if dim < group_dim)
+                    inner.append(group_dim - num_before)
+            if len(inner) > 0:
+                new_groups.append(inner)
+
+        return GroupSpec(groups=new_groups)

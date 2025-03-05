@@ -1,7 +1,7 @@
-from .binary_elementwise_spec import BinaryElementwiseSpec
+from .binary_broadcast_elementwise_spec import BinaryBroadcastElementwiseSpec
 from .fold_spec import FoldSpec
 from .group_spec import GroupSpec
-from .op_spec import OpSpec
+from .op_spec import OpSpec, ReducedDimension
 from .pad_spec import PadSpec
 from .permute_spec import PermuteSpec
 from .reduce_spec import ReduceSpec

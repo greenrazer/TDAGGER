@@ -3,7 +3,7 @@ from enum import Enum, auto
 from typing import Dict, List, Set, Tuple, Type, Union
 
 from ....compute_stats import ComputeStats
-from ...safe_ir import ScalarSpec, SpecType, TensorSpec
+from ...safe_ir import ScalarSpec, SpecType, SymbolicTensorSpec, TensorSpec
 from ..inputs.op_input import OpInput
 from ..inputs.unary_tensor_input import UnaryTensorInput
 from .op_spec import OpSpec
@@ -94,3 +94,6 @@ class UnaryElementwiseSpec(OpSpec):
             reads=input_0_size,  # one read per element
             writes=output_size,  # one write to the output tensor
         )
+
+    def with_removed_dimensions(self, dimensions: List[int]) -> "UnaryElementwiseSpec":
+        return self

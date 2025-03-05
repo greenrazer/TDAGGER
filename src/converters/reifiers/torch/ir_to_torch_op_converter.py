@@ -5,7 +5,7 @@ import torch
 
 from ....graph.dag_graph import DAGGraph
 from ....ir.safe_ir import (
-    BinaryElementwiseSpec,
+    BinaryBroadcastElementwiseSpec,
     OpType,
     PadSpec,
     ReduceSpec,
@@ -34,8 +34,8 @@ UNARY_ELEMENTWISE_SPEC_TO_ATEN = {
 }
 
 BINARY_ELEMENTWISE_SPEC_TO_ATEN = {
-    f"binary_{BinaryElementwiseSpec.BinaryElementwiseType.ADD}": "aten::add",
-    f"binary_{BinaryElementwiseSpec.BinaryElementwiseType.MULTIPLY}": "aten::mul",
+    f"binary_{BinaryBroadcastElementwiseSpec.BinaryElementwiseType.ADD}": "aten::add",
+    f"binary_{BinaryBroadcastElementwiseSpec.BinaryElementwiseType.MULTIPLY}": "aten::mul",
 }
 
 REDUCE_SPEC_TO_ATEN = {
@@ -111,25 +111,33 @@ class IRToTorchOpConverter(OpConverter[ConversionContext, Callable, OpType, List
         node = context.torch_graph.create(BINARY_ELEMENTWISE_SPEC_TO_ATEN[op.spec.type])
 
         match (input_0_val.type().kind(), input_1_val.type().kind(), op.spec.op_type):
-            case ("TensorType", _, BinaryElementwiseSpec.BinaryElementwiseType.ADD):
+            case (
+                "TensorType",
+                _,
+                BinaryBroadcastElementwiseSpec.BinaryElementwiseType.ADD,
+            ):
                 node.addInput(input_0_val)
                 node.addInput(input_1_val)
                 node.addInput(context.torch_graph.insertConstant(1))
-            case (_, "TensorType", BinaryElementwiseSpec.BinaryElementwiseType.ADD):
+            case (
+                _,
+                "TensorType",
+                BinaryBroadcastElementwiseSpec.BinaryElementwiseType.ADD,
+            ):
                 node.addInput(input_1_val)
                 node.addInput(input_0_val)
                 node.addInput(context.torch_graph.insertConstant(1))
             case (
                 "TensorType",
                 _,
-                BinaryElementwiseSpec.BinaryElementwiseType.MULTIPLY,
+                BinaryBroadcastElementwiseSpec.BinaryElementwiseType.MULTIPLY,
             ):
                 node.addInput(input_0_val)
                 node.addInput(input_1_val)
             case (
                 _,
                 "TensorType",
-                BinaryElementwiseSpec.BinaryElementwiseType.MULTIPLY,
+                BinaryBroadcastElementwiseSpec.BinaryElementwiseType.MULTIPLY,
             ):
                 node.addInput(input_1_val)
                 node.addInput(input_0_val)
@@ -236,8 +244,13 @@ class IRToTorchOpConverter(OpConverter[ConversionContext, Callable, OpType, List
 
         input_val = context.name_to_output_value[op.input.input]
 
-        nodes = []
+        if len(sorted_inds) == 0:
+            node = context.torch_graph.create("aten::alias")
+            node.addInput(input_val)
+            node.output().setType(torch._C.TensorType.get())
+            return [node]
 
+        nodes = []
         last_inp = input_val
         for i in sorted_inds:
             curr_val = op.spec.slice[i]
@@ -267,6 +280,12 @@ class IRToTorchOpConverter(OpConverter[ConversionContext, Callable, OpType, List
         sorted_inds = sorted(op.spec.select.keys())
 
         input_val = context.name_to_output_value[op.input.input]
+
+        if len(sorted_inds) == 0:
+            node = context.torch_graph.create("aten::alias")
+            node.addInput(input_val)
+            node.output().setType(torch._C.TensorType.get())
+            return [node]
 
         nodes = []
 
@@ -301,7 +320,7 @@ class IRToTorchOpConverter(OpConverter[ConversionContext, Callable, OpType, List
         node.addInput(input_val)
         node.addInput(
             context.torch_graph.insertConstant(
-                context.graph.op_output_shapes[op.name].shape
+                context.graph.op_output_specs[op.name].shape
             )
         )
         return [node]
@@ -315,7 +334,7 @@ class IRToTorchOpConverter(OpConverter[ConversionContext, Callable, OpType, List
 
         # padding is stored in reverse last dim -> first dim
         pad_arr = []
-        output_dims = len(context.graph.op_output_shapes[op.name].shape)
+        output_dims = len(context.graph.op_output_specs[op.name].shape)
         for i in range(output_dims - 1, min(op.spec.pad.keys()) - 1, -1):
             if i in op.spec.pad:
                 pad_arr.extend(list(op.spec.pad[i]))
@@ -348,7 +367,7 @@ class IRToTorchOpConverter(OpConverter[ConversionContext, Callable, OpType, List
                 node.addInput(input_val)
                 node.addInput(
                     context.torch_graph.insertConstant(
-                        context.graph.op_output_shapes[op.name].shape[-2:]
+                        context.graph.op_output_specs[op.name].shape[-2:]
                     )
                 )
                 fold_dict = op.spec.fold
@@ -359,8 +378,8 @@ class IRToTorchOpConverter(OpConverter[ConversionContext, Callable, OpType, List
             case _:
                 raise Exception(f"Fold type Unknown: {op.spec.type}")
 
-        key_0 = 0 + len(context.graph.op_output_shapes[op.name].shape) - 2  # here
-        key_1 = 1 + len(context.graph.op_output_shapes[op.name].shape) - 2
+        key_0 = 0 + len(context.graph.op_output_specs[op.name].shape) - 2  # here
+        key_1 = 1 + len(context.graph.op_output_specs[op.name].shape) - 2
         kernel_h, stride_h = fold_dict[key_0] if key_0 in fold_dict else (0, 0)
         kernel_w, stride_w = fold_dict[key_1] if key_1 in fold_dict else (0, 0)
         kernel = [kernel_h, kernel_w]
@@ -378,6 +397,12 @@ class IRToTorchOpConverter(OpConverter[ConversionContext, Callable, OpType, List
         self, context: ConversionContext, op: OpType
     ) -> List[torch._C.Node]:
         input_val = context.name_to_output_value[op.input.input]
+
+        if len(op.spec.dimensions) == 0:
+            node = context.torch_graph.create("aten::alias")
+            node.addInput(input_val)
+            node.output().setType(torch._C.TensorType.get())
+            return [node]
 
         output = []
         match op.spec.type:
@@ -414,7 +439,7 @@ class IRToTorchOpConverter(OpConverter[ConversionContext, Callable, OpType, List
         node = context.torch_graph.create("aten::repeat")
 
         repeat_list = []
-        for d in range(len(context.graph.op_output_shapes[op.name].shape)):
+        for d in range(len(context.graph.op_output_specs[op.name].shape)):
             if d in op.spec.repeat:
                 repeat_list.append(op.spec.repeat[d])
             else:

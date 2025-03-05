@@ -1,8 +1,9 @@
 from dataclasses import dataclass
 from enum import Enum, auto
-from typing import Any, Tuple, Union
+from typing import Any, Dict, List, Union
 
 import numpy as np
+from sympy import Expr, Symbol
 
 
 class DataType(Enum):
@@ -48,7 +49,7 @@ class ScalarType:
 
 @dataclass
 class TensorSpec:
-    shape: Tuple[int, ...]
+    shape: List[int]
     data_type: DataType
 
     def size(self) -> int:
@@ -60,6 +61,35 @@ class TensorSpec:
     def size_bytes(self) -> int:
         return self.size() * self.data_type.size()
 
+    def to_symbolic(self, name: str) -> "SymbolicTensorSpec":
+        return SymbolicTensorSpec(
+            shape=[Symbol(f"{name}_{dim}") for dim, _ in enumerate(self.shape)],
+            data_type=self.data_type,
+        )
+
+    def symbolic_values(self, name: str) -> Dict[str, int]:
+        out = {}
+        for dim, size in enumerate(self.shape):
+            out[f"{name}_{dim}"] = size
+        return out
+
+
+@dataclass
+class SymbolicTensorSpec:
+    shape: List[Expr]
+    data_type: DataType
+
+    def size(self) -> Expr:
+        out = 1
+        for s in self.shape:
+            out *= s
+        return out
+
+    def size_bytes(self) -> Expr:
+        return self.size() * self.data_type.size()
+
+    def to_concrete(self, symbol_values: Dict[str, int]) -> "TensorSpec": ...
+
 
 @dataclass
 class TensorType:
@@ -67,5 +97,5 @@ class TensorType:
     data: np.array
 
 
-SpecType = Union[ScalarSpec, TensorSpec]
-DataHolderType = Union[ScalarSpec, TensorSpec]
+SpecType = Union[ScalarSpec, TensorSpec, SymbolicTensorSpec]
+DataHolderType = Union[ScalarType, TensorType]

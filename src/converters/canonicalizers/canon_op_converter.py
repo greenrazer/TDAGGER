@@ -1,16 +1,16 @@
 from typing import Callable, Dict, Generic, List, Tuple, TypeVar, Union
 
 from ...ir.safe_ir import (
-    BinaryElementwiseSpec,
+    BinaryBroadcastElementwiseSpec,
     BinaryTensorInput,
     DataType,
     OpType,
+    RepeatSpec,
     ScalarSpec,
     ScalarType,
     TensorType,
     UnaryElementwiseSpec,
     UnaryTensorInput,
-    RepeatSpec,
     UnsqueezeSpec,
 )
 from ..op_converter import OpConverter
@@ -44,7 +44,9 @@ class CanonOpConverter(
         op = OpType(
             name=f"{name}",
             input=BinaryTensorInput(input_a, neg_b.name),
-            spec=BinaryElementwiseSpec(BinaryElementwiseSpec.BinaryElementwiseType.ADD),
+            spec=BinaryBroadcastElementwiseSpec(
+                BinaryBroadcastElementwiseSpec.BinaryElementwiseType.ADD
+            ),
             debug_sources=debug_sources,
         )
 
@@ -69,8 +71,8 @@ class CanonOpConverter(
         op = OpType(
             name=f"{name}",
             input=BinaryTensorInput(input_a, reciprocal_b.name),
-            spec=BinaryElementwiseSpec(
-                BinaryElementwiseSpec.BinaryElementwiseType.MULTIPLY
+            spec=BinaryBroadcastElementwiseSpec(
+                BinaryBroadcastElementwiseSpec.BinaryElementwiseType.MULTIPLY
             ),
             debug_sources=debug_sources,
         )
@@ -90,8 +92,8 @@ class CanonOpConverter(
         op = OpType(
             name=f"{name}",
             input=BinaryTensorInput(input, sign_op.name),
-            spec=BinaryElementwiseSpec(
-                BinaryElementwiseSpec.BinaryElementwiseType.MULTIPLY
+            spec=BinaryBroadcastElementwiseSpec(
+                BinaryBroadcastElementwiseSpec.BinaryElementwiseType.MULTIPLY
             ),
             debug_sources=debug_sources,
         )
@@ -107,7 +109,9 @@ class CanonOpConverter(
         op = OpType(
             name=f"{name}",
             input=BinaryTensorInput(input, one_name),
-            spec=BinaryElementwiseSpec(BinaryElementwiseSpec.BinaryElementwiseType.ADD),
+            spec=BinaryBroadcastElementwiseSpec(
+                BinaryBroadcastElementwiseSpec.BinaryElementwiseType.ADD
+            ),
             debug_sources=debug_sources,
         )
 
@@ -122,8 +126,8 @@ class CanonOpConverter(
         div_by_2 = OpType(
             name=f"{name}",
             input=BinaryTensorInput(input, half_name),
-            spec=BinaryElementwiseSpec(
-                BinaryElementwiseSpec.BinaryElementwiseType.MULTIPLY
+            spec=BinaryBroadcastElementwiseSpec(
+                BinaryBroadcastElementwiseSpec.BinaryElementwiseType.MULTIPLY
             ),
             debug_sources=debug_sources,
         )
@@ -136,7 +140,9 @@ class CanonOpConverter(
         add_op = OpType(
             name=f"{name}_add",
             input=BinaryTensorInput(input_a, input_b),
-            spec=BinaryElementwiseSpec(BinaryElementwiseSpec.BinaryElementwiseType.ADD),
+            spec=BinaryBroadcastElementwiseSpec(
+                BinaryBroadcastElementwiseSpec.BinaryElementwiseType.ADD
+            ),
             debug_sources=debug_sources,
         )
         sub_ops, sub_consts = self._create_subtract(
@@ -167,7 +173,9 @@ class CanonOpConverter(
         middle_op = OpType(
             name=f"{name}_middle_op",
             input=BinaryTensorInput(add_op.name, abs_ops[-1].name),
-            spec=BinaryElementwiseSpec(BinaryElementwiseSpec.BinaryElementwiseType.ADD),
+            spec=BinaryBroadcastElementwiseSpec(
+                BinaryBroadcastElementwiseSpec.BinaryElementwiseType.ADD
+            ),
             debug_sources=debug_sources,
         )
 
@@ -207,7 +215,9 @@ class CanonOpConverter(
         middle_op = OpType(
             name=f"{name}_middle_op",
             input=BinaryTensorInput(input, abs_ops[-1].name),
-            spec=BinaryElementwiseSpec(BinaryElementwiseSpec.BinaryElementwiseType.ADD),
+            spec=BinaryBroadcastElementwiseSpec(
+                BinaryBroadcastElementwiseSpec.BinaryElementwiseType.ADD
+            ),
             debug_sources=debug_sources,
         )
 
@@ -242,8 +252,8 @@ class CanonOpConverter(
         x_part = OpType(
             name=f"{name}_x_part",
             input=BinaryTensorInput(x_coeff_ops[-1].name, input),
-            spec=BinaryElementwiseSpec(
-                BinaryElementwiseSpec.BinaryElementwiseType.MULTIPLY
+            spec=BinaryBroadcastElementwiseSpec(
+                BinaryBroadcastElementwiseSpec.BinaryElementwiseType.MULTIPLY
             ),
             debug_sources=debug_sources,
         )
@@ -283,8 +293,8 @@ class CanonOpConverter(
         x_abs_part = OpType(
             name=f"{name}_x_abs_part",
             input=BinaryTensorInput(x_abs_coeff_ops[-1].name, abs_ops[-1].name),
-            spec=BinaryElementwiseSpec(
-                BinaryElementwiseSpec.BinaryElementwiseType.MULTIPLY
+            spec=BinaryBroadcastElementwiseSpec(
+                BinaryBroadcastElementwiseSpec.BinaryElementwiseType.MULTIPLY
             ),
             debug_sources=debug_sources,
         )
@@ -293,7 +303,9 @@ class CanonOpConverter(
         add_op = OpType(
             name=f"{name}",
             input=BinaryTensorInput(x_part.name, x_abs_part.name),
-            spec=BinaryElementwiseSpec(BinaryElementwiseSpec.BinaryElementwiseType.ADD),
+            spec=BinaryBroadcastElementwiseSpec(
+                BinaryBroadcastElementwiseSpec.BinaryElementwiseType.ADD
+            ),
             debug_sources=debug_sources,
         )
 
@@ -326,8 +338,8 @@ class CanonOpConverter(
         mul_op = OpType(
             name=f"{name}_mul",
             input=BinaryTensorInput(input, beta),
-            spec=BinaryElementwiseSpec(
-                BinaryElementwiseSpec.BinaryElementwiseType.MULTIPLY
+            spec=BinaryBroadcastElementwiseSpec(
+                BinaryBroadcastElementwiseSpec.BinaryElementwiseType.MULTIPLY
             ),
             debug_sources=debug_sources,
         )

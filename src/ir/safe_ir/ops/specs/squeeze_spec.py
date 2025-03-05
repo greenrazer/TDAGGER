@@ -3,7 +3,7 @@ from enum import Enum, auto
 from typing import Any, Dict, List, Set, Tuple, Type, Union
 
 from ....compute_stats import ComputeStats
-from ...safe_ir import ScalarSpec, SpecType, TensorSpec
+from ...safe_ir import ScalarSpec, SpecType, SymbolicTensorSpec, TensorSpec
 from ..inputs.op_input import OpInput
 from ..inputs.unary_tensor_input import UnaryTensorInput
 from .op_spec import OpSpec
@@ -64,10 +64,11 @@ class SqueezeSpec(OpSpec):
         out_shape = []
         for i, size in enumerate(inputs[0].shape):
             if i in real_indices:
-                if size != 1:
-                    raise Exception(
-                        f"cannot squeeze dimension with size greater than 1: dimension={i} size={size}."
-                    )
+                if isinstance(size, int):
+                    if size != 1:
+                        raise Exception(
+                            f"cannot squeeze dimension with size greater than 1: dimension={i} shape={inputs[0].shape}."
+                        )
                 seen[i] = True
             else:
                 out_shape.append(size)
@@ -77,7 +78,10 @@ class SqueezeSpec(OpSpec):
                 f"shape not sufficient for squeeze spec: {inputs[0].shape}."
             )
 
-        return TensorSpec(shape=out_shape, data_type=inputs[0].data_type)
+        out_cls = (
+            TensorSpec if isinstance(inputs[0], TensorSpec) else SymbolicTensorSpec
+        )
+        return out_cls(shape=out_shape, data_type=inputs[0].data_type)
 
     def compute_stats(self, inputs: List[SpecType]) -> ComputeStats:
         out_spec = self.output_spec(inputs)
@@ -86,3 +90,11 @@ class SqueezeSpec(OpSpec):
             reads=out_spec.size(),
             writes=out_spec.size(),
         )
+
+    def with_removed_dimensions(self, dimensions: List[int]) -> "SqueezeSpec":
+        new_squeeze = set()
+        for squeeze_dim in self.dimensions:
+            if squeeze_dim not in dimensions:
+                num_before = sum(1 for dim in dimensions if dim < squeeze_dim)
+                new_squeeze.add(squeeze_dim - num_before)
+        return SqueezeSpec(dimensions=new_squeeze)

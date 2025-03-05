@@ -1,13 +1,13 @@
 import math
 import unittest
 
-from src.ir.safe_ir import BinaryElementwiseSpec, DataType, TensorSpec
+from src.ir.safe_ir import BinaryBroadcastElementwiseSpec, DataType, TensorSpec
 
 
 class TestBinaryElementwiseOutputSpec(unittest.TestCase):
     def test_basic(self):
-        spec = BinaryElementwiseSpec(
-            op_type=BinaryElementwiseSpec.BinaryElementwiseType.ADD
+        spec = BinaryBroadcastElementwiseSpec(
+            op_type=BinaryBroadcastElementwiseSpec.BinaryElementwiseType.ADD
         )
 
         input_specs = [
@@ -21,8 +21,8 @@ class TestBinaryElementwiseOutputSpec(unittest.TestCase):
         self.assertEqual(out_spec.data_type, DataType.FLOAT32)
 
     def test_raises_on_incorrect_sizes(self):
-        spec = BinaryElementwiseSpec(
-            op_type=BinaryElementwiseSpec.BinaryElementwiseType.ADD
+        spec = BinaryBroadcastElementwiseSpec(
+            op_type=BinaryBroadcastElementwiseSpec.BinaryElementwiseType.ADD
         )
 
         input_specs = [
@@ -36,8 +36,8 @@ class TestBinaryElementwiseOutputSpec(unittest.TestCase):
 
 class TestGroupComputeStats(unittest.TestCase):
     def test_basic(self):
-        spec = BinaryElementwiseSpec(
-            op_type=BinaryElementwiseSpec.BinaryElementwiseType.ADD
+        spec = BinaryBroadcastElementwiseSpec(
+            op_type=BinaryBroadcastElementwiseSpec.BinaryElementwiseType.ADD
         )
 
         input_specs = [

@@ -3,7 +3,7 @@ from enum import Enum, auto
 from typing import Any, Dict, List, Set, Tuple, Type, Union
 
 from ....compute_stats import ComputeStats
-from ...safe_ir import ScalarSpec, SpecType, TensorSpec
+from ...safe_ir import ScalarSpec, SpecType, SymbolicTensorSpec, TensorSpec
 from ..inputs.op_input import OpInput
 from ..inputs.unary_tensor_input import UnaryTensorInput
 from .op_spec import OpSpec
@@ -84,7 +84,10 @@ class PermuteSpec(OpSpec):
                 f"shape not sufficient for permute spec: {inputs[0].shape}."
             )
 
-        return TensorSpec(shape=out_shape, data_type=inputs[0].data_type)
+        out_cls = (
+            TensorSpec if isinstance(inputs[0], TensorSpec) else SymbolicTensorSpec
+        )
+        return out_cls(shape=out_shape, data_type=inputs[0].data_type)
 
     def compute_stats(self, inputs: List[SpecType]) -> ComputeStats:
         out_spec = self.output_spec(inputs)
@@ -93,3 +96,25 @@ class PermuteSpec(OpSpec):
             reads=inputs[0].size(),
             writes=out_spec.size(),
         )
+
+    def with_removed_dimensions(self, dimensions: List[int]) -> "PermuteSpec":
+        new_permute_dict = {}
+        for permute_dim_a, permute_dim_b in self.permutation.items():
+            num_before_a = sum(1 for dim in dimensions if dim < permute_dim_a)
+            match (permute_dim_a in dimensions, permute_dim_b in dimensions):
+                case (False, True):
+                    # find next dim in permutation cycle
+                    next_dim = permute_dim_b
+                    while next_dim in dimensions:
+                        next_dim = self.permutation[next_dim]
+                    num_before_b = sum(1 for dim in dimensions if dim < next_dim)
+                    new_permute_dict[permute_dim_a - num_before_a] = (
+                        next_dim - num_before_b
+                    )
+                case (False, False):
+                    num_before_b = sum(1 for dim in dimensions if dim < permute_dim_b)
+                    new_permute_dict[permute_dim_a - num_before_a] = (
+                        permute_dim_b - num_before_b
+                    )
+
+        return PermuteSpec(permutation=new_permute_dict)

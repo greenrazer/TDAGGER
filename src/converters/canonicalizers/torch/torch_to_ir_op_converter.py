@@ -5,7 +5,7 @@ from typing import Any, Callable, Dict, List, Tuple, Union
 import torch
 
 from ....ir.safe_ir import (
-    BinaryElementwiseSpec,
+    BinaryBroadcastElementwiseSpec,
     BinaryTensorInput,
     DataHolderType,
     DataType,
@@ -20,6 +20,7 @@ from ....ir.safe_ir import (
     RepeatSpec,
     ScalarSpec,
     ScalarType,
+    SelectSpec,
     SliceSpec,
     SpecType,
     SqueezeSpec,
@@ -30,7 +31,6 @@ from ....ir.safe_ir import (
     UnfoldSpec,
     UngroupSpec,
     UnsqueezeSpec,
-    SelectSpec,
 )
 from ..canon_op_converter import CanonOpConverter
 from .group_helpers import specs_from_reshape
@@ -56,8 +56,8 @@ ATEN_TO_UNARY_ELEMENTWISE_SPEC = {
 }
 
 ATEN_TO_BINARY_ELEMENTWISE_SPEC = {
-    "aten::add": BinaryElementwiseSpec.BinaryElementwiseType.ADD,
-    "aten::mul": BinaryElementwiseSpec.BinaryElementwiseType.MULTIPLY,
+    "aten::add": BinaryBroadcastElementwiseSpec.BinaryElementwiseType.ADD,
+    "aten::mul": BinaryBroadcastElementwiseSpec.BinaryElementwiseType.MULTIPLY,
 }
 
 ATEN_TO_REDUCE_SPEC_TYPE = {
@@ -204,7 +204,7 @@ class TorchToIROpConverter(
         bin_op = OpType(
             name=out_name,
             input=BinaryTensorInput(input_names[0], input_names[1]),
-            spec=BinaryElementwiseSpec(
+            spec=BinaryBroadcastElementwiseSpec(
                 ATEN_TO_BINARY_ELEMENTWISE_SPEC[torch_op.kind()]
             ),
             debug_sources=context.debug_sources,

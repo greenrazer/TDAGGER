@@ -1,12 +1,13 @@
 from .inputs import BinaryTensorInput, OpInput, UnaryTensorInput
 from .op_type import OpType
 from .specs import (
-    BinaryElementwiseSpec,
+    BinaryBroadcastElementwiseSpec,
     FoldSpec,
     GroupSpec,
     OpSpec,
     PadSpec,
     PermuteSpec,
+    ReducedDimension,
     ReduceSpec,
     RepeatSpec,
     SelectSpec,

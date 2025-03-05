@@ -3,10 +3,10 @@ from enum import Enum, auto
 from typing import Any, Dict, List, Set, Tuple, Type, Union
 
 from ....compute_stats import ComputeStats
-from ...safe_ir import ScalarSpec, SpecType, TensorSpec
+from ...safe_ir import ScalarSpec, SpecType, SymbolicTensorSpec, TensorSpec
 from ..inputs.op_input import OpInput
 from ..inputs.unary_tensor_input import UnaryTensorInput
-from .op_spec import OpSpec
+from .op_spec import OpSpec, ReducedDimension
 
 
 @dataclass
@@ -73,11 +73,14 @@ class SelectSpec(OpSpec):
                     if real_indices_dict[i] >= 0
                     else size + real_indices_dict[i]
                 )
-                if real_select >= size:
-                    raise Exception(
-                        f"Select out of bounds: dimension={i} size={size} index={real_select}"
-                    )
-                out_shape.append(1)
+                if isinstance(size, int):
+                    if real_select >= size:
+                        raise Exception(
+                            f"Select out of bounds: dimension={i} size={size} index={real_select}"
+                        )
+                    out_shape.append(1)
+                else:
+                    out_shape.append(ReducedDimension(size))
                 seen[i] = True
             else:
                 out_shape.append(size)
@@ -85,7 +88,10 @@ class SelectSpec(OpSpec):
         if not all(seen.values()):
             raise Exception(f"shape not sufficient for select spec: {inputs[0].shape}.")
 
-        return TensorSpec(shape=out_shape, data_type=inputs[0].data_type)
+        out_cls = (
+            TensorSpec if isinstance(inputs[0], TensorSpec) else SymbolicTensorSpec
+        )
+        return out_cls(shape=out_shape, data_type=inputs[0].data_type)
 
     def compute_stats(self, inputs: List[SpecType]) -> ComputeStats:
         out_spec = self.output_spec(inputs)
@@ -94,3 +100,11 @@ class SelectSpec(OpSpec):
             reads=out_spec.size(),
             writes=out_spec.size(),
         )
+
+    def with_removed_dimensions(self, dimensions: List[int]) -> "SelectSpec":
+        new_select_dict = {}
+        for select_dim, select_info in self.select.items():
+            if select_dim not in dimensions:
+                num_before = sum(1 for dim in dimensions if dim < select_dim)
+                new_select_dict[select_dim - num_before] = select_info
+        return SelectSpec(select=new_select_dict)
