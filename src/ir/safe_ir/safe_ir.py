@@ -76,7 +76,7 @@ class TensorSpec:
 
 @dataclass
 class SymbolicTensorSpec:
-    shape: List[Expr]
+    shape: List[Union[int, Expr]]
     data_type: DataType
 
     def size(self) -> Expr:
@@ -90,6 +90,12 @@ class SymbolicTensorSpec:
 
     def to_concrete(self, symbol_values: Dict[str, int]) -> "TensorSpec": ...
 
+    def dimensions_to_remove(self, dimension_symbol: Symbol) -> List[int]:
+        dimensions_to_remove = []
+        for dim, expr in enumerate(self.shape):
+            if not isinstance(expr, int) and expr.has(dimension_symbol):
+                dimensions_to_remove.append(dim)
+        return dimensions_to_remove
 
 @dataclass
 class TensorType:

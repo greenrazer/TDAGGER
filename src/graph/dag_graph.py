@@ -253,7 +253,7 @@ class DAGGraph:
                 for sym_size in sym_op_spec.shape:
                     sym_size.subs(old_symbol, new_symbol)
 
-    def with_removed_dimensions(self, dimension_name: str) -> "DAGGraph":
+    def with_removed_dimension(self, dimension_name: str) -> "DAGGraph":
         if dimension_name not in self.symbolic_input_shape_values:
             raise Exception(
                 f"Dimension not found: {dimension_name} valid={self.symbolic_input_shape_values.keys()}."
@@ -265,36 +265,11 @@ class DAGGraph:
         for layer in self.layers:
             for op_name in layer:
                 op = self.ops[op_name]
-                op_output_spec = self.symbolic_op_output_specs[op_name]
-                if isinstance(op_output_spec, ScalarSpec):
-                    new_ops[op_name] = op
-                elif isinstance(op.input, UnaryTensorInput):
-                    if (
-                        op.input.input in self.name_registry
-                        and op.input.input not in self.inputs
-                        and op.input.input not in self.ops
-                    ):
-                        new_ops[op_name] = op
-
-                    op_input_spec = (
-                        self.symbolic_input_specs[op.input.input]
-                        if op.input.input in self.inputs
-                        else self.symbolic_op_output_specs[op.input.input]
-                    )
-
-                    dimensions_to_remove = []
-                    for dim, expr in enumerate(op_input_spec.shape):
-                        if not isinstance(expr, int) and expr.has(dimension_symbol):
-                            dimensions_to_remove.append(dim)
-
-                    new_ops[op_name] = OpType(
-                        name=op.name,
-                        spec=op.spec.with_removed_dimensions(dimensions_to_remove),
-                        input=op.input,
-                        debug_sources=op.debug_sources,
-                    )
-                else:
-                    new_ops[op_name] = op
+                new_ops[op_name] = op.with_removed_dimension(
+                    dimension_symbol,
+                    self.symbolic_input_specs,
+                    self.symbolic_op_output_specs,
+                )
 
         new_inputs = {}
         for input_name in self.inputs:

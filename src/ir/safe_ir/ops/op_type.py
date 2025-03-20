@@ -1,8 +1,11 @@
 from abc import ABC, abstractmethod
 from typing import Dict, List, Set, Tuple, Union
 
-from .inputs.op_input import OpInput
-from .specs.op_spec import OpSpec
+from sympy import Symbol
+
+from .inputs import OpInput, UnaryTensorInput
+from .specs import OpSpec
+from ..safe_ir import SymbolicTensorSpec, SpecType
 
 
 class OpType(ABC):
@@ -37,3 +40,34 @@ class OpType(ABC):
 
     def __str__(self):
         return f"%{self.name}: {self.spec.format_input(self.input)}{self.debug_sources_to_str()}"
+
+    def with_removed_dimension(
+        self,
+        dimension_symbol: Symbol,
+        symbolic_input_specs: Dict[str, SpecType],
+        symbolic_op_output_specs: Dict[str, SpecType],
+    ) -> "OpType":
+        if isinstance(self.input, UnaryTensorInput):
+            input_name = self.input.input
+            if input_name in symbolic_input_specs:
+                op_input_spec = symbolic_input_specs[input_name]
+            elif input_name in symbolic_op_output_specs:
+                op_input_spec = symbolic_op_output_specs[input_name]
+            else:
+                return self
+
+            if not isinstance(op_input_spec, SymbolicTensorSpec):
+                return self
+            else:
+                dimensions_to_remove = op_input_spec.dimensions_to_remove(
+                    dimension_symbol
+                )
+
+                return OpType(
+                    name=self.name,
+                    spec=self.spec.with_removed_dimensions(dimensions_to_remove),
+                    input=self.input,
+                    debug_sources=self.debug_sources,
+                )
+        else:
+            return self

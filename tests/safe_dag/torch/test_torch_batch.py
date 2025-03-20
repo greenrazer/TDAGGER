@@ -69,7 +69,7 @@ class TestTorchBatch(unittest.TestCase):
     def test_without_batch_reconstructed_output(self):
         with_batch_tdag = TensorDAG.from_torchscript(self.with_batch_traced_model)
         without_batch_tdag = TensorDAG(
-            with_batch_tdag.graph.with_removed_dimensions("x_1_0")
+            with_batch_tdag.graph.with_removed_dimension("x_1_0")
         )
 
         out_model = without_batch_tdag.to_torchscript()
